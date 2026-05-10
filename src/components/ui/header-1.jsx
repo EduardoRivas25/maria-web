@@ -5,22 +5,22 @@ import { MenuToggleIcon } from '@/components/ui/menu-toggle-icon';
 import { useScroll } from '@/components/ui/use-scroll';
 import { createPortal } from 'react-dom';
 
-export function Header() {
+export function Header({ onSignInClick, onRegisterClick, onLogoClick }) {
 	const [open, setOpen] = React.useState(false);
 	const scrolled = useScroll(10);
 
 	const links = [
 		{
-			label: 'Features',
-			href: '#',
+			label: 'Características',
+			href: '#features',
 		},
 		{
-			label: 'Pricing',
-			href: '#',
+			label: 'Precios',
+			href: '#pricing',
 		},
 		{
-			label: 'About',
-			href: '#',
+			label: 'Integraciones',
+			href: '#integrations',
 		},
 	];
 
@@ -43,17 +43,17 @@ export function Header() {
 			)}
 		>
 			<nav className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between px-4">
-				<div className="hover:bg-accent rounded-md p-2 flex items-center gap-2">
+				<button onClick={onLogoClick} className="hover:bg-white/5 rounded-md p-2 flex items-center gap-2 transition-colors cursor-pointer border-none bg-transparent">
 					<img src="logomaria-texto.png" alt="Maria Logo" className="h-12 w-auto object-contain" />
-				</div>
+				</button>
 				<div className="hidden items-center gap-2 md:flex">
 					{links.map((link) => (
 						<a key={link.label} className={buttonVariants({ variant: 'ghost' })} href={link.href}>
 							{link.label}
 						</a>
 					))}
-					<Button variant="outline">Sign In</Button>
-					<Button>Get Started</Button>
+					<Button variant="outline" onClick={onSignInClick}>Iniciar Sesión</Button>
+					<Button className="bg-[#f99e02] hover:bg-[#e08e02] text-white font-semibold" onClick={onRegisterClick}>Comenzar</Button>
 				</div>
 				<Button
 					size="icon"
@@ -83,10 +83,10 @@ export function Header() {
 					))}
 				</div>
 				<div className="flex flex-col gap-2">
-					<Button variant="outline" className="w-full bg-transparent">
-						Sign In
+					<Button variant="outline" className="w-full bg-transparent" onClick={(e) => { setOpen(false); onSignInClick?.(e); }}>
+						Iniciar Sesión
 					</Button>
-					<Button className="w-full">Get Started</Button>
+					<Button className="w-full bg-[#f99e02] hover:bg-[#e08e02] text-white font-semibold" onClick={(e) => { setOpen(false); onRegisterClick?.(e); }}>Comenzar</Button>
 				</div>
 			</MobileMenu>
 		</header>

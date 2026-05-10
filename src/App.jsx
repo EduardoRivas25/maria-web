@@ -8,18 +8,35 @@ import { LinkCard } from '@/components/ui/link-card'
 import { FlowDiagram } from '@/components/ui/flow-diagram'
 import IntegrationHero from '@/components/ui/integration-hero'
 import PricingSection from '@/components/ui/pricing-section'
+import { MariaFooter } from '@/components/ui/maria-footer'
+import LoginPage from '@/components/ui/login-page'
+import SignInPage from '@/components/ui/sign-in-page'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [currentPage, setCurrentPage] = useState('landing')
+
+  const handleLogoClick = () => {
+    if (currentPage === 'landing') {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } else {
+      setCurrentPage('landing')
+      setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col relative overflow-clip">
-      <Header />
+      {currentPage === 'landing' ? (
+        <>
+          <Header 
+            onLogoClick={handleLogoClick} 
+            onSignInClick={() => setCurrentPage('signin')}
+            onRegisterClick={() => setCurrentPage('login')} 
+          />
 
-      {/* Dark space for navbar area */}
-      <div className="h-14 w-full bg-background relative z-20" />
-
-      {/* Hero Section with Background ShapeGrid */}
+          {/* Dark space for navbar area */}
+          <div className="h-14 w-full bg-background relative z-20" />
+          {/* Hero Section with Background ShapeGrid */}
       <div className="relative w-full h-[calc(100vh-3.5rem)] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
           <ShapeGrid
@@ -73,7 +90,7 @@ function App() {
       </div>
 
       {/* El Problema Section */}
-      <section className="relative z-10 py-16 px-8 max-w-7xl mx-auto w-full">
+      <section id="features" className="relative z-10 py-16 px-8 max-w-7xl mx-auto w-full">
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold text-white">El </h2>
           <span className="text-[#f99e02] font-bold text-4xl md:text-5xl mb-4">Problema</span>
@@ -105,7 +122,7 @@ function App() {
       </section>
 
       {/* La Solución Unificada Section */}
-      <section className="relative z-10 py-16 px-8 max-w-7xl mx-auto w-full my-4">
+      <section id="about" className="relative z-10 py-16 px-8 max-w-7xl mx-auto w-full my-4">
         <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md p-8 md:p-16 flex flex-col md:flex-row items-center gap-16 overflow-hidden relative">
 
           {/* Subtle background glow */}
@@ -166,6 +183,20 @@ function App() {
 
       {/* Pricing Section */}
       <PricingSection />
+
+      <MariaFooter />
+        </>
+      ) : currentPage === 'login' ? (
+        <LoginPage 
+            onBack={() => setCurrentPage('landing')} 
+            onSignInClick={() => setCurrentPage('signin')} 
+        />
+      ) : (
+        <SignInPage 
+            onBack={() => setCurrentPage('landing')} 
+            onRegisterClick={() => setCurrentPage('login')} 
+        />
+      )}
     </div>
   )
 }
