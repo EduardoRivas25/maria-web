@@ -34,7 +34,7 @@ const repeatedIcons = (icons, repeat = 4) => Array.from({ length: repeat }).flat
 
 export default function IntegrationHero() {
   return (
-    <section className="relative py-16 overflow-hidden z-10 w-full">
+    <section id="integrations" className="relative py-16 overflow-hidden z-10 w-full">
       {/* Light grid background adapted for dark theme */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.05)_1px,transparent_1px)] [background-size:24px_24px]" />
 
@@ -49,7 +49,7 @@ export default function IntegrationHero() {
         <p className="mt-4 text-xl text-white/60 max-w-2xl mx-auto leading-relaxed">
           M.A.R.I.A. interactúa nativamente con Google Workspace, Notion y más de 250 aplicaciones para ejecutar tus órdenes sin fricción.
         </p>
-        
+
         <Button className="mt-10 px-8 py-6 rounded-xl bg-[#f99e02] text-white font-bold hover:bg-[#e08e02] transition-colors text-lg shadow-[0_0_30px_rgba(249,158,2,0.3)]">
           Ver todas las integraciones
         </Button>
@@ -80,7 +80,8 @@ export default function IntegrationHero() {
         </div>
       </div>
 
-      <style dangerouslySetInnerHTML={{__html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @keyframes scroll-left {
           0% { transform: translateX(0); }
           100% { transform: translateX(-50%); }
