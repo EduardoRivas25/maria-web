@@ -5,7 +5,8 @@ import { Label } from '@/components/ui/label';
 import { motion } from 'framer-motion';
 import DotField from '@/components/ui/DotField';
 
-export default function SignInPage({ onBack, onRegisterClick }) {
+export default function SignInPage({ onBack, onRegisterClick, onLogin }) {
+    const handleSubmit = (e) => { e.preventDefault(); onLogin?.(); };
     return (
         <section className="flex min-h-screen items-center justify-center bg-background px-4 py-16 relative overflow-hidden">
             {/* DotField Background */}
@@ -24,6 +25,7 @@ export default function SignInPage({ onBack, onRegisterClick }) {
             </div>
 
             <motion.form
+                onSubmit={handleSubmit}
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 transition={{ duration: 0.5, ease: "easeOut" }}

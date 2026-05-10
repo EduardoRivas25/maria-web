@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Header } from '@/components/ui/header-1'
 import ShapeGrid from '@/components/ui/ShapeGrid'
 
@@ -14,6 +15,7 @@ import SignInPage from '@/components/ui/sign-in-page'
 
 function App() {
   const [currentPage, setCurrentPage] = useState('landing')
+  const navigate = useNavigate()
 
   const handleLogoClick = () => {
     if (currentPage === 'landing') {
@@ -22,6 +24,11 @@ function App() {
       setCurrentPage('landing')
       setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0)
     }
+  }
+
+  const handleLogin = () => {
+    // For now, any data → redirect to dashboard
+    navigate('/dashboard')
   }
 
   return (
@@ -189,12 +196,14 @@ function App() {
       ) : currentPage === 'login' ? (
         <LoginPage 
             onBack={() => setCurrentPage('landing')} 
-            onSignInClick={() => setCurrentPage('signin')} 
+            onSignInClick={() => setCurrentPage('signin')}
+            onLogin={handleLogin}
         />
       ) : (
         <SignInPage 
             onBack={() => setCurrentPage('landing')} 
-            onRegisterClick={() => setCurrentPage('login')} 
+            onRegisterClick={() => setCurrentPage('login')}
+            onLogin={handleLogin}
         />
       )}
     </div>
