@@ -16,7 +16,7 @@ export default function DashboardLayout() {
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
 
-      {/* Main Content Area */}
+      {/* Main Content Area MARIA */}
       <motion.div
         initial={false}
         animate={{ marginLeft: sidebarCollapsed ? 72 : 240 }}
