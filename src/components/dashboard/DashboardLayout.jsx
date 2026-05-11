@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
-import MariaBubble from "./MariaBubble";
 
 export default function DashboardLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -45,12 +44,12 @@ export default function DashboardLayout() {
       </AnimatePresence>
 
       {/* Sidebar - Desktop and Mobile Drawer */}
-      <div 
-        className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
-          isMobile ? (mobileMenuOpen ? "translate-x-0" : "-translate-x-full") : ""
-        }`}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${isMobile ? (mobileMenuOpen ? "translate-x-0" : "-translate-x-full") : ""
+          }`}
       >
         <Sidebar
+          isMobile={isMobile}
           collapsed={isMobile ? false : sidebarCollapsed}
           onToggle={() => {
             if (isMobile) {
@@ -60,7 +59,7 @@ export default function DashboardLayout() {
             }
           }}
         />
-        
+
         {/* Close Button inside Sidebar on Mobile */}
         {isMobile && (
           <button
@@ -72,17 +71,6 @@ export default function DashboardLayout() {
         )}
       </div>
 
-      {/* Mobile Hamburger Button */}
-      {isMobile && !mobileMenuOpen && (
-        <motion.button
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          onClick={() => setMobileMenuOpen(true)}
-          className="fixed bottom-6 left-6 z-30 p-3.5 bg-[#f99e02] text-white rounded-full shadow-[0_4px_20px_rgba(249,158,2,0.4)] hover:scale-105 transition-transform"
-        >
-          <Menu size={24} />
-        </motion.button>
-      )}
 
       {/* Main Content Area MARIA */}
       <motion.div
@@ -92,7 +80,7 @@ export default function DashboardLayout() {
         className="flex flex-col min-h-screen relative"
       >
         {/* Topbar */}
-        <Topbar />
+        <Topbar isMobile={isMobile} onOpenMobileMenu={() => setMobileMenuOpen(true)} />
 
         {/* Page Content */}
         <main className="flex-1 p-4 sm:p-6 overflow-x-hidden">
@@ -100,8 +88,6 @@ export default function DashboardLayout() {
         </main>
       </motion.div>
 
-      {/* M.A.R.I.A. Floating Bubble */}
-      <MariaBubble />
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   CheckSquare,
   Calendar,
   Clock,
+  Menu,
 } from "lucide-react";
 import { mockNotifications, mockUser } from "@/data/mockData";
 
@@ -30,7 +31,7 @@ const notifIcons = {
   reminder: Clock,
 };
 
-export default function Topbar() {
+export default function Topbar({ isMobile, onOpenMobileMenu }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [showNotifs, setShowNotifs] = useState(false);
@@ -60,16 +61,26 @@ export default function Topbar() {
       className="sticky top-0 z-30 flex items-center justify-between h-16 px-6 border-b border-white/5"
       style={{ background: "rgba(10, 10, 11, 0.8)", backdropFilter: "blur(20px)" }}
     >
-      {/* Page Title */}
-      <motion.h1
-        key={currentTitle}
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.2 }}
-        className="text-lg font-semibold text-white"
-      >
-        {currentTitle}
-      </motion.h1>
+      <div className="flex items-center gap-3">
+        {isMobile && (
+          <button
+            onClick={onOpenMobileMenu}
+            className="p-2 text-white/60 hover:text-white hover:bg-white/5 rounded-xl transition-colors cursor-pointer border-none bg-transparent"
+          >
+            <Menu size={24} />
+          </button>
+        )}
+        {/* Page Title */}
+        <motion.h1
+          key={currentTitle}
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2 }}
+          className="text-lg font-semibold text-white"
+        >
+          {currentTitle}
+        </motion.h1>
+      </div>
 
       {/* Right Actions */}
       <div className="flex items-center gap-2">

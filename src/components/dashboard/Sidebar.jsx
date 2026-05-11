@@ -12,6 +12,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  X,
 } from "lucide-react";
 
 const navItems = [
@@ -25,7 +26,7 @@ const navItems = [
   { to: "/dashboard/configuracion", icon: Settings, label: "Configuración" },
 ];
 
-export default function Sidebar({ collapsed, onToggle }) {
+export default function Sidebar({ collapsed, onToggle, isMobile }) {
   const location = useLocation();
 
   return (
@@ -124,14 +125,18 @@ export default function Sidebar({ collapsed, onToggle }) {
       </nav>
 
       {/* Collapse Toggle */}
-      <div className="p-3 border-t border-white/5">
+      <div className="p-3 pb-8 border-t border-white/5">
         <button
-          onClick={onToggle}
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
           className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl
                      text-white/40 hover:text-white/80 hover:bg-white/5
                      transition-all duration-200 bg-transparent border-none cursor-pointer"
         >
-          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+          {isMobile ? <X size={18} /> : (collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />)}
           <AnimatePresence>
             {!collapsed && (
               <motion.span
@@ -141,7 +146,7 @@ export default function Sidebar({ collapsed, onToggle }) {
                 transition={{ duration: 0.2 }}
                 className="text-xs font-medium whitespace-nowrap overflow-hidden"
               >
-                Colapsar
+                {isMobile ? "Cerrar" : "Colapsar"}
               </motion.span>
             )}
           </AnimatePresence>
