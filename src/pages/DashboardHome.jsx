@@ -26,9 +26,9 @@ function Card({ children, className = "", ...props }) {
   return (
     <motion.div
       variants={itemVariants}
-      className={`bg-white/[0.03] border border-white/[0.06] backdrop-blur-md rounded-2xl p-5 
+      className={`bg-white/[0.03] border border-white/[0.06] backdrop-blur-md rounded-2xl p-4 sm:p-5 
                   hover:border-white/10 hover:shadow-[0_0_30px_rgba(249,158,2,0.04)] 
-                  transition-all duration-300 ${className}`}
+                  transition-all duration-300 min-w-0 ${className}`}
       {...props}
     >
       {children}
@@ -85,7 +85,7 @@ export default function DashboardHome() {
       variants={containerVariants}
       initial="hidden"
       animate="show"
-      className="grid grid-cols-1 lg:grid-cols-3 gap-5 max-w-[1400px]"
+      className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 max-w-[1400px] w-full"
     >
       {/* Upcoming Events */}
       <Card>
@@ -115,15 +115,15 @@ export default function DashboardHome() {
       {/* Task Summary */}
       <Card>
         <CardHeader icon={CheckSquare} title="Resumen de Tareas" action />
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
           {[
             { label: "Pendientes", count: todoCount, color: "#f99e02", bg: "bg-[#f99e02]/10" },
             { label: "En progreso", count: inProgressCount, color: "#3b82f6", bg: "bg-blue-500/10" },
             { label: "Completadas", count: doneCount, color: "#10b981", bg: "bg-emerald-500/10" },
           ].map((item) => (
-            <div key={item.label} className={`${item.bg} rounded-xl p-3 text-center`}>
-              <p className="text-2xl font-bold" style={{ color: item.color }}>{item.count}</p>
-              <p className="text-[11px] text-white/40 mt-1">{item.label}</p>
+            <div key={item.label} className={`${item.bg} rounded-xl p-2 sm:p-3 text-center flex flex-col justify-center`}>
+              <p className="text-xl sm:text-2xl font-bold" style={{ color: item.color }}>{item.count}</p>
+              <p className="text-[10px] sm:text-[11px] text-white/50 mt-1 leading-tight">{item.label}</p>
             </div>
           ))}
         </div>
@@ -132,7 +132,7 @@ export default function DashboardHome() {
       {/* Weekly Productivity Chart */}
       <Card className="lg:row-span-2">
         <CardHeader icon={TrendingUp} title="Productividad Semanal" />
-        <div className="h-[280px] mt-2">
+        <div className="h-[220px] sm:h-[280px] mt-2 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={mockWeeklyProductivity} barCategoryGap="20%">
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
@@ -206,7 +206,7 @@ export default function DashboardHome() {
       {/* Recent Files */}
       <Card className="lg:col-span-2">
         <CardHeader icon={FolderOpen} title="Archivos Recientes" action />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {recentFiles.map((file) => {
             const typeColors = {
               pdf: "#ef4444",
