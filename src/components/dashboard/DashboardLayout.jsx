@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X } from "lucide-react";
+import { Menu } from "lucide-react";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 
@@ -13,8 +13,9 @@ export default function DashboardLayout() {
 
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth < 1024);
-      if (window.innerWidth >= 1024) {
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+      if (!mobile) {
         setMobileMenuOpen(false);
       }
     };
@@ -30,49 +31,53 @@ export default function DashboardLayout() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0b] overflow-x-hidden">
-      {/* Mobile Menu Overlay */}
+      {/* Mobile Menu Overlay — closes sidebar on tap */}
       <AnimatePresence>
         {isMobile && mobileMenuOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.25 }}
             className="fixed inset-0 bg-black/60 z-40 backdrop-blur-sm"
             onClick={() => setMobileMenuOpen(false)}
           />
         )}
       </AnimatePresence>
 
-      {/* Sidebar - Desktop and Mobile Drawer */}
-      <div
-        className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${isMobile ? (mobileMenuOpen ? "translate-x-0" : "-translate-x-full") : ""
-          }`}
-      >
-        <Sidebar
-          isMobile={isMobile}
-          collapsed={isMobile ? false : sidebarCollapsed}
-          onToggle={() => {
-            if (isMobile) {
-              setMobileMenuOpen(false);
-            } else {
-              setSidebarCollapsed(!sidebarCollapsed);
-            }
-          }}
-        />
+      {/* Sidebar */}
+      {isMobile ? (
+        /* Mobile: off-screen drawer, only rendered when open */
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              className="fixed inset-y-0 left-0 z-50"
+              style={{ width: 260 }}
+            >
+              <Sidebar
+                isMobile={true}
+                collapsed={false}
+                onClose={() => setMobileMenuOpen(false)}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      ) : (
+        /* Desktop: always visible, collapsible */
+        <div className="fixed inset-y-0 left-0 z-50">
+          <Sidebar
+            isMobile={false}
+            collapsed={sidebarCollapsed}
+            onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          />
+        </div>
+      )}
 
-        {/* Close Button inside Sidebar on Mobile */}
-        {isMobile && (
-          <button
-            onClick={() => setMobileMenuOpen(false)}
-            className="absolute top-4 right-4 z-50 p-2 text-white/50 hover:text-white bg-white/5 rounded-full"
-          >
-            <X size={20} />
-          </button>
-        )}
-      </div>
-
-
-      {/* Main Content Area MARIA */}
+      {/* Main Content Area */}
       <motion.div
         initial={false}
         animate={{ marginLeft: isMobile ? 0 : (sidebarCollapsed ? 72 : 240) }}
@@ -87,7 +92,6 @@ export default function DashboardLayout() {
           <Outlet />
         </main>
       </motion.div>
-
     </div>
   );
 }

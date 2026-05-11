@@ -16,9 +16,9 @@ export default function FilesPage() {
 
   return (
     <div className="max-w-[1400px]">
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 w-72">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 w-full sm:w-72">
             <Search size={14} className="text-white/30" />
             <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Buscar archivos..." className="bg-transparent border-none outline-none text-sm text-white placeholder-white/30 flex-1" />
           </div>
@@ -29,7 +29,7 @@ export default function FilesPage() {
             <span>Proyecto M.A.R.I.A.</span>
           </div>
         </div>
-        <div className="flex items-center gap-1 bg-white/[0.03] border border-white/[0.06] rounded-xl p-1">
+        <div className="flex items-center gap-1 bg-white/[0.03] border border-white/[0.06] rounded-xl p-1 self-start sm:self-auto">
           <button onClick={() => setViewMode("grid")} className={`p-2 rounded-lg transition-all border-none cursor-pointer ${viewMode === "grid" ? "bg-[#f99e02]/15 text-[#f99e02]" : "text-white/40 hover:text-white/70 bg-transparent"}`}><Grid3X3 size={14} /></button>
           <button onClick={() => setViewMode("list")} className={`p-2 rounded-lg transition-all border-none cursor-pointer ${viewMode === "list" ? "bg-[#f99e02]/15 text-[#f99e02]" : "text-white/40 hover:text-white/70 bg-transparent"}`}><List size={14} /></button>
         </div>
@@ -58,7 +58,8 @@ export default function FilesPage() {
           })}
         </motion.div>
       ) : (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white/[0.02] border border-white/[0.04] rounded-2xl overflow-hidden">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white/[0.02] border border-white/[0.04] rounded-2xl overflow-x-auto hide-scrollbar">
+          <div className="min-w-[600px]">
           <div className="grid grid-cols-[1fr_100px_120px_80px_100px] px-5 py-3 border-b border-white/[0.06] text-xs text-white/30 font-medium">
             <span>Nombre</span><span>Tipo</span><span>Modificado</span><span>Tamaño</span><span>Acciones</span>
           </div>
@@ -82,6 +83,7 @@ export default function FilesPage() {
               </div>
             );
           })}
+          </div>
         </motion.div>
       )}
     </div>

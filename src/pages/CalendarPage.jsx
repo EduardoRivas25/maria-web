@@ -31,9 +31,9 @@ export default function CalendarPage() {
   return (
     <div className="max-w-[1400px]">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-bold text-white">
+      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+        <div className="flex items-center justify-between w-full md:w-auto gap-4">
+          <h2 className="text-xl md:text-2xl font-bold text-white capitalize">
             {format(currentDate, "MMMM yyyy", { locale: es })}
           </h2>
           <div className="flex items-center gap-1">
@@ -46,9 +46,9 @@ export default function CalendarPage() {
             </button>
           </div>
         </div>
-        <div className="flex items-center gap-1 bg-white/[0.03] border border-white/[0.06] rounded-xl p-1">
+        <div className="flex items-center gap-1 bg-white/[0.03] border border-white/[0.06] rounded-xl p-1 overflow-x-auto w-full md:w-auto hide-scrollbar">
           {["day", "week", "month", "agenda"].map((v) => (
-            <button key={v} onClick={() => setView(v)} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-none cursor-pointer ${view === v ? "bg-[#f99e02]/15 text-[#f99e02]" : "text-white/40 hover:text-white/70 bg-transparent"}`}>
+            <button key={v} onClick={() => setView(v)} className={`px-3 py-1.5 flex-1 md:flex-none rounded-lg text-xs font-medium transition-all border-none cursor-pointer ${view === v ? "bg-[#f99e02]/15 text-[#f99e02]" : "text-white/40 hover:text-white/70 bg-transparent"}`}>
               {v === "day" ? "Día" : v === "week" ? "Semana" : v === "month" ? "Mes" : "Agenda"}
             </button>
           ))}
@@ -57,7 +57,8 @@ export default function CalendarPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-5">
         {/* Calendar Grid */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-5">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-3 md:p-5 overflow-x-auto hide-scrollbar">
+          <div className="min-w-[500px]">
           {/* Day headers */}
           <div className="grid grid-cols-7 gap-1 mb-2">
             {dayNames.map((d) => (
@@ -95,6 +96,7 @@ export default function CalendarPage() {
                 </button>
               );
             })}
+          </div>
           </div>
         </motion.div>
 

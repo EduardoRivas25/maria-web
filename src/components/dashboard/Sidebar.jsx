@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -26,19 +25,19 @@ const navItems = [
   { to: "/dashboard/configuracion", icon: Settings, label: "Configuración" },
 ];
 
-export default function Sidebar({ collapsed, onToggle, isMobile }) {
+export default function Sidebar({ collapsed, onToggle, onClose, isMobile }) {
   const location = useLocation();
 
   return (
     <motion.aside
       initial={false}
-      animate={{ width: collapsed ? 72 : 240 }}
+      animate={{ width: isMobile ? 260 : (collapsed ? 72 : 240) }}
       transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-      className="fixed left-0 top-0 bottom-0 z-40 flex flex-col border-r border-white/5"
+      className="h-full flex flex-col border-r border-white/5"
       style={{ background: "#0d0d0d" }}
     >
-      {/* Logo */}
-      <div className="flex items-center h-16 px-4 border-b border-white/5">
+      {/* Header: Logo + Close button on mobile */}
+      <div className="flex items-center justify-between h-16 px-4 border-b border-white/5">
         <NavLink to="/dashboard" className="flex items-center gap-3 no-underline">
           <img
             src="/logomariaM.png"
@@ -46,7 +45,7 @@ export default function Sidebar({ collapsed, onToggle, isMobile }) {
             className="h-9 w-9 object-contain flex-shrink-0"
           />
           <AnimatePresence>
-            {!collapsed && (
+            {(!collapsed || isMobile) && (
               <motion.span
                 initial={{ opacity: 0, width: 0 }}
                 animate={{ opacity: 1, width: "auto" }}
@@ -59,6 +58,19 @@ export default function Sidebar({ collapsed, onToggle, isMobile }) {
             )}
           </AnimatePresence>
         </NavLink>
+
+        {/* Close (X) button — only on mobile */}
+        {isMobile && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 text-white/50 hover:text-white hover:bg-white/10 rounded-xl
+                       transition-colors duration-200 bg-transparent border-none cursor-pointer"
+            aria-label="Cerrar menú"
+          >
+            <X size={22} />
+          </button>
+        )}
       </div>
 
       {/* Navigation */}
@@ -76,6 +88,7 @@ export default function Sidebar({ collapsed, onToggle, isMobile }) {
               to={item.to}
               end={item.end}
               className="no-underline block"
+              onClick={() => { if (isMobile && onClose) onClose(); }}
             >
               <motion.div
                 whileHover={{ x: 4 }}
@@ -106,7 +119,7 @@ export default function Sidebar({ collapsed, onToggle, isMobile }) {
                 />
 
                 <AnimatePresence>
-                  {!collapsed && (
+                  {(!collapsed || isMobile) && (
                     <motion.span
                       initial={{ opacity: 0, width: 0 }}
                       animate={{ opacity: 1, width: "auto" }}
@@ -124,34 +137,36 @@ export default function Sidebar({ collapsed, onToggle, isMobile }) {
         })}
       </nav>
 
-      {/* Collapse Toggle */}
-      <div className="p-3 pb-8 border-t border-white/5">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle();
-          }}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl
-                     text-white/40 hover:text-white/80 hover:bg-white/5
-                     transition-all duration-200 bg-transparent border-none cursor-pointer"
-        >
-          {isMobile ? <X size={18} /> : (collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />)}
-          <AnimatePresence>
-            {!collapsed && (
-              <motion.span
-                initial={{ opacity: 0, width: 0 }}
-                animate={{ opacity: 1, width: "auto" }}
-                exit={{ opacity: 0, width: 0 }}
-                transition={{ duration: 0.2 }}
-                className="text-xs font-medium whitespace-nowrap overflow-hidden"
-              >
-                {isMobile ? "Cerrar" : "Colapsar"}
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </button>
-      </div>
+      {/* Footer: Collapse toggle (desktop only) */}
+      {!isMobile && (
+        <div className="p-3 pb-8 border-t border-white/5">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl
+                       text-white/40 hover:text-white/80 hover:bg-white/5
+                       transition-all duration-200 bg-transparent border-none cursor-pointer"
+          >
+            {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
+            <AnimatePresence>
+              {!collapsed && (
+                <motion.span
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: "auto" }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="text-xs font-medium whitespace-nowrap overflow-hidden"
+                >
+                  Colapsar
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </button>
+        </div>
+      )}
     </motion.aside>
   );
 }

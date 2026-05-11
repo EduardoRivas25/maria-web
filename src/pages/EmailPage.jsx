@@ -22,19 +22,19 @@ export default function EmailPage() {
   };
 
   return (
-    <div className="max-w-[1400px] h-[calc(100vh-7rem)]">
-      <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 w-80">
+    <div className="max-w-[1400px] flex flex-col h-[calc(100vh-7rem)] lg:h-[calc(100vh-6rem)]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-5 gap-3 shrink-0">
+        <div className="flex items-center gap-2 bg-white/[0.03] border border-white/[0.06] rounded-xl px-3 py-2 w-full sm:w-80">
           <Search size={14} className="text-white/30" />
           <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Buscar correos..." className="bg-transparent border-none outline-none text-sm text-white placeholder-white/30 flex-1" />
         </div>
         <p className="text-xs text-white/30">{emails.filter((e) => !e.read).length} no leídos</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-5 h-[calc(100%-3.5rem)]">
+      <div className="flex flex-col lg:grid lg:grid-cols-[1fr_1fr] gap-5 flex-1 min-h-0 overflow-y-auto lg:overflow-hidden hide-scrollbar">
         {/* Email List */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white/[0.02] border border-white/[0.04] rounded-2xl overflow-hidden flex flex-col">
-          <div className="overflow-y-auto flex-1">
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white/[0.02] border border-white/[0.04] rounded-2xl overflow-hidden flex flex-col h-[400px] lg:h-auto shrink-0 lg:shrink">
+          <div className="overflow-y-auto flex-1 hide-scrollbar">
             {filtered.map((email) => (
               <div
                 key={email.id}
@@ -63,7 +63,7 @@ export default function EmailPage() {
         </motion.div>
 
         {/* Email Preview */}
-        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className="bg-white/[0.02] border border-white/[0.04] rounded-2xl overflow-hidden flex flex-col">
+        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className="bg-white/[0.02] border border-white/[0.04] rounded-2xl overflow-hidden flex flex-col min-h-[500px] lg:min-h-0 flex-1">
           {selected ? (
             <div className="flex flex-col h-full">
               <div className="px-6 py-5 border-b border-white/[0.04]">
