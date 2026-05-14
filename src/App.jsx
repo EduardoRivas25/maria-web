@@ -172,13 +172,14 @@ function App() {
       </section>
 
       {/* Cómo Funciona Section */}
-      <section className="relative z-10 py-16 px-8 max-w-7xl mx-auto w-full">
-        <div className="text-center mb-20">
+      <section id="how-it-works" className="relative z-10">
+        {/* Section header — shown before the pinned area */}
+        <div className="text-center pt-24 pb-8 px-8">
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
             Cómo <span className="text-[#f99e02]">Funciona</span>
           </h2>
-          <p className="text-xl text-white/60 max-w-2xl mx-auto">
-            El flujo técnico detrás de la magia. Así es como M.A.R.I.A. convierte tus palabras en acciones reales.
+          <p className="text-lg text-white/50 max-w-md mx-auto">
+            De tu voz a la acción, en segundos.
           </p>
         </div>
 

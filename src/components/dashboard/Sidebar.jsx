@@ -12,11 +12,13 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  BookOpen,
 } from "lucide-react";
 
 const navItems = [
   { to: "/dashboard", icon: Home, label: "Inicio", end: true },
   { to: "/dashboard/tareas", icon: CheckSquare, label: "Tareas" },
+  { to: "/dashboard/clases", icon: BookOpen, label: "Classroom" },
   { to: "/dashboard/calendario", icon: Calendar, label: "Calendario" },
   { to: "/dashboard/correos", icon: Mail, label: "Correos" },
   { to: "/dashboard/archivos", icon: FolderOpen, label: "Archivos" },

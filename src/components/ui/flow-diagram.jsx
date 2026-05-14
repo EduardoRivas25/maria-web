@@ -1,149 +1,306 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { MessageSquare, BrainCircuit, Workflow, CheckCircle } from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
+import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
+import { Mic, BrainCircuit, Zap, Rocket } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const steps = [
-  { 
-    id: 1, 
-    title: "Instrucción", 
-    desc: "El usuario da una orden por texto o voz.", 
-    icon: MessageSquare 
+  {
+    id: 1,
+    title: "Habla",
+    desc: "Texto o voz, tú decides.",
+    icon: Mic,
   },
-  { 
-    id: 2, 
-    title: "Interpretación", 
-    desc: "Gemini 3 analiza la intención exacta.", 
-    icon: BrainCircuit 
+  {
+    id: 2,
+    title: "Entiende",
+    desc: "IA que capta tu intención.",
+    icon: BrainCircuit,
   },
-  { 
-    id: 3, 
-    title: "Automatización", 
-    desc: "n8n orquesta los flujos de trabajo.", 
-    icon: Workflow 
+  {
+    id: 3,
+    title: "Orquesta",
+    desc: "Automatiza tus flujos.",
+    icon: Zap,
   },
-  { 
-    id: 4, 
-    title: "Ejecución", 
-    desc: "La acción se completa en la app destino.", 
-    icon: CheckCircle 
+  {
+    id: 4,
+    title: "Ejecuta",
+    desc: "Acción completada.",
+    icon: Rocket,
   },
 ];
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.4,
-      delayChildren: 0.2
-    }
-  }
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
-    y: 0,
-    transition: { type: "spring", stiffness: 100, damping: 15 }
-  }
-};
-
-const lineVariants = {
-  hidden: { scaleX: 0, opacity: 0 },
-  visible: { 
-    scaleX: 1, 
-    opacity: 1,
-    transition: { duration: 1.2, ease: "easeInOut", delay: 0.5 }
-  }
-};
-
-const floatingIconVariants = {
-  animate: {
-    y: [0, -10, 0],
-    transition: {
-      duration: 4,
-      ease: "easeInOut",
-      repeat: Infinity,
-    }
-  }
-};
-
 export function FlowDiagram({ className }) {
+  const containerRef = useRef(null);
+  const trackRef = useRef(null);
+
+  const { scrollYProgress } = useScroll({
+    target: containerRef,
+    offset: ["start start", "end end"],
+  });
+
+  // Smooth spring for the path drawing
+  const smoothProgress = useSpring(scrollYProgress, {
+    stiffness: 100,
+    damping: 30,
+    restDelta: 0.001,
+  });
+
+  // Horizontal translate: move the track from 0% to reveal all 4 panels
+  // Each panel is ~100vw, we need to move 3 panels worth to the left
+  const translateX = useTransform(smoothProgress, [0.05, 0.95], ["0%", "-75%"]);
+
+  // Progress line width
+  const lineWidth = useTransform(smoothProgress, [0.05, 0.92], ["0%", "100%"]);
+
+  // Per-step activation thresholds
+  const stepActivation = [
+    [0.0, 0.15],
+    [0.22, 0.37],
+    [0.44, 0.59],
+    [0.66, 0.81],
+  ];
+
   return (
-    <div className={cn("w-full py-12", className)}>
-      <motion.div 
-        className="flex flex-col md:flex-row items-center justify-between relative max-w-5xl mx-auto"
-        variants={containerVariants}
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true, margin: "-100px" }}
-      >
-        
-        {/* Background connecting line for desktop */}
-        <div className="hidden md:block absolute top-12 left-[12%] right-[12%] h-[2px] bg-white/5 z-0 rounded-full">
-          {/* Static gradient line that draws in */}
-          <motion.div 
-            className="h-full bg-gradient-to-r from-transparent via-[#f99e02]/50 to-transparent origin-left"
-            variants={lineVariants}
+    <div
+      ref={containerRef}
+      className={cn("relative", className)}
+      style={{ height: "400vh" }}
+    >
+      {/* Sticky viewport */}
+      <div className="sticky top-0 h-screen w-full overflow-hidden flex flex-col justify-center">
+
+        {/* Ambient background glow */}
+        <motion.div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vw] h-[60vh] rounded-full pointer-events-none z-0"
+          style={{
+            background: "radial-gradient(ellipse, rgba(249,158,2,0.06) 0%, transparent 70%)",
+            opacity: useTransform(smoothProgress, [0, 0.1], [0, 1]),
+          }}
+        />
+
+        {/* ─── Progress line (top) ─── */}
+        <div className="relative w-full h-[3px] mb-12 mt-4 z-10">
+          {/* Track background */}
+          <div className="absolute inset-0 bg-white/[0.04] rounded-full" />
+          {/* Drawn line */}
+          <motion.div
+            className="absolute top-0 left-0 h-full rounded-full"
+            style={{
+              width: lineWidth,
+              background: "linear-gradient(90deg, #f99e02, #ffb640, #f99e02)",
+              boxShadow: "0 0 20px rgba(249,158,2,0.4), 0 0 60px rgba(249,158,2,0.15)",
+            }}
           />
-          {/* Animated moving dot representing data flow */}
-          <motion.div 
-            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-[#f99e02] rounded-full shadow-[0_0_20px_4px_#f99e02]"
-            initial={{ left: "0%", opacity: 0, x: "-50%" }}
-            animate={{ left: "100%", opacity: [0, 1, 1, 0] }}
-            transition={{ duration: 3.5, ease: "linear", repeat: Infinity, repeatDelay: 1 }}
+          {/* Travelling particle on the line */}
+          <motion.div
+            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white z-10"
+            style={{
+              left: lineWidth,
+              boxShadow: "0 0 12px 4px rgba(249,158,2,0.8), 0 0 30px 8px rgba(249,158,2,0.3)",
+              opacity: useTransform(smoothProgress, [0.03, 0.08, 0.88, 0.93], [0, 1, 1, 0]),
+            }}
           />
+
+          {/* Step markers on the line */}
+          {steps.map((step, i) => {
+            const markerLeft = `${12.5 + i * 25}%`;
+            const [start, end] = stepActivation[i];
+            return (
+              <motion.div
+                key={step.id}
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 flex flex-col items-center"
+                style={{ left: markerLeft }}
+              >
+                {/* Outer ring */}
+                <motion.div
+                  className="w-5 h-5 rounded-full border-2 flex items-center justify-center"
+                  style={{
+                    borderColor: useTransform(
+                      smoothProgress,
+                      [start, end],
+                      ["rgba(255,255,255,0.1)", "#f99e02"]
+                    ),
+                    background: useTransform(
+                      smoothProgress,
+                      [start, end],
+                      ["rgba(0,0,0,0.5)", "rgba(249,158,2,0.15)"]
+                    ),
+                  }}
+                >
+                  <motion.div
+                    className="w-2 h-2 rounded-full"
+                    style={{
+                      backgroundColor: useTransform(
+                        smoothProgress,
+                        [start, end],
+                        ["rgba(255,255,255,0.15)", "#f99e02"]
+                      ),
+                    }}
+                  />
+                </motion.div>
+                {/* Step number below marker */}
+                <motion.span
+                  className="text-[10px] font-bold mt-2 tracking-wider"
+                  style={{
+                    color: useTransform(
+                      smoothProgress,
+                      [start, end],
+                      ["rgba(255,255,255,0.2)", "#f99e02"]
+                    ),
+                  }}
+                >
+                  0{step.id}
+                </motion.span>
+              </motion.div>
+            );
+          })}
         </div>
 
-        {/* Steps */}
-        {steps.map((step, index) => (
-          <React.Fragment key={step.id}>
-            <motion.div 
-              className="flex flex-col items-center relative z-10 w-64 my-6 md:my-0 group"
-              variants={itemVariants}
-            >
-              {/* Icon Container with Floating Animation */}
-              <motion.div 
-                className="w-24 h-24 rounded-2xl bg-gradient-to-b from-white/10 to-white/5 border border-white/10 backdrop-blur-md flex items-center justify-center mb-6 shadow-xl transition-all duration-300 group-hover:scale-110 group-hover:border-[#f99e02]/50 group-hover:shadow-[0_0_40px_rgba(249,158,2,0.4)] relative overflow-hidden"
-                variants={floatingIconVariants}
-                animate="animate"
-                // Adding a slight delay based on index so they don't float in perfect sync
-                style={{ animationDelay: `${index * 0.5}s` }}
-              >
-                {/* Inner glow on hover */}
-                <div className="absolute inset-0 bg-gradient-to-tr from-[#f99e02]/0 via-[#f99e02]/0 to-[#f99e02]/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                
-                {/* Subtle pulse effect */}
-                <div className="absolute inset-0 rounded-2xl border border-[#f99e02]/40 animate-ping opacity-0 group-hover:opacity-100" />
-                
-                <step.icon className="w-10 h-10 text-white group-hover:text-[#f99e02] transition-colors duration-300 relative z-10" />
-              </motion.div>
-              
-              {/* Text */}
-              <div className="text-center transition-transform duration-300 group-hover:-translate-y-1">
-                <h4 className="text-xl font-bold text-white mb-2 group-hover:text-[#f99e02] transition-colors">{step.id}. {step.title}</h4>
-                <p className="text-sm text-white/60 leading-relaxed px-4">
-                  {step.desc}
-                </p>
-              </div>
-            </motion.div>
+        {/* ─── Horizontal sliding track ─── */}
+        <motion.div
+          ref={trackRef}
+          className="flex w-[400vw] relative z-10"
+          style={{ x: translateX }}
+        >
+          {steps.map((step, i) => {
+            const [start, end] = stepActivation[i];
+            return (
+              <StepPanel
+                key={step.id}
+                step={step}
+                index={i}
+                scrollProgress={smoothProgress}
+                start={start}
+                end={end}
+              />
+            );
+          })}
+        </motion.div>
 
-            {/* Mobile connecting line with moving data packet */}
-            {index < steps.length - 1 && (
-              <div className="block md:hidden h-16 w-[2px] bg-white/5 relative my-2">
-                <motion.div 
-                  className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#f99e02] rounded-full shadow-[0_0_10px_#f99e02]"
-                  initial={{ top: "0%", opacity: 0 }}
-                  animate={{ top: "100%", opacity: [0, 1, 1, 0] }}
-                  transition={{ duration: 2, ease: "linear", repeat: Infinity, delay: index * 0.5 }}
-                />
-              </div>
-            )}
-          </React.Fragment>
-        ))}
+        {/* ─── Scroll indicator ─── */}
+        <motion.div
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 z-10"
+          style={{
+            opacity: useTransform(smoothProgress, [0, 0.08], [1, 0]),
+          }}
+        >
+          <span className="text-[10px] tracking-[0.3em] uppercase text-white/25 font-medium">
+            Scroll para explorar
+          </span>
+          <div className="w-5 h-8 rounded-full border border-white/15 flex items-start justify-center p-1">
+            <motion.div
+              className="w-1 h-1 bg-[#f99e02] rounded-full"
+              animate={{ y: [0, 14, 0] }}
+              transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+            />
+          </div>
+        </motion.div>
+      </div>
+    </div>
+  );
+}
 
+/* ─── Individual Step Panel ─── */
+function StepPanel({ step, index, scrollProgress, start, end }) {
+  const opacity = useTransform(scrollProgress, [start, end - 0.03, end], [0, 0.5, 1]);
+  const scale = useTransform(scrollProgress, [start, end], [0.85, 1]);
+  const y = useTransform(scrollProgress, [start, end], [40, 0]);
+
+  // Icon container animation
+  const iconRotate = useTransform(scrollProgress, [start, end], [-10, 0]);
+  const iconScale = useTransform(scrollProgress, [start, end], [0.6, 1]);
+
+  // Glow behind card
+  const glowOpacity = useTransform(scrollProgress, [start, end, end + 0.05], [0, 0, 0.6]);
+
+  return (
+    <div className="w-[100vw] flex items-center justify-center px-8 md:px-16">
+      <motion.div
+        className="relative max-w-lg w-full"
+        style={{ opacity, scale, y }}
+      >
+        {/* Background glow */}
+        <motion.div
+          className="absolute -inset-8 rounded-3xl pointer-events-none"
+          style={{
+            background: `radial-gradient(ellipse at center, rgba(249,158,2,0.08) 0%, transparent 70%)`,
+            opacity: glowOpacity,
+          }}
+        />
+
+        {/* Card */}
+        <div className="relative rounded-2xl border border-white/[0.08] bg-white/[0.03] backdrop-blur-xl p-8 md:p-12 overflow-hidden group hover:border-[#f99e02]/30 transition-colors duration-500">
+
+          {/* Subtle gradient overlay on hover */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[#f99e02]/0 via-transparent to-[#f99e02]/0 group-hover:from-[#f99e02]/[0.03] group-hover:to-[#f99e02]/[0.01] transition-all duration-700 pointer-events-none" />
+
+          {/* Step number watermark */}
+          <div className="absolute top-4 right-6 text-[120px] font-black text-white/[0.02] leading-none select-none pointer-events-none">
+            {step.id}
+          </div>
+
+          {/* Icon */}
+          <motion.div
+            className="w-16 h-16 md:w-20 md:h-20 rounded-2xl flex items-center justify-center mb-6 relative"
+            style={{
+              background: "linear-gradient(135deg, rgba(249,158,2,0.15), rgba(249,158,2,0.05))",
+              border: "1px solid rgba(249,158,2,0.25)",
+              rotate: iconRotate,
+              scale: iconScale,
+            }}
+          >
+            {/* Animated ring around icon */}
+            <motion.div
+              className="absolute inset-[-4px] rounded-2xl border border-[#f99e02]/20"
+              style={{
+                opacity: useTransform(scrollProgress, [end, end + 0.03], [0, 1]),
+              }}
+            />
+            <step.icon className="w-8 h-8 md:w-10 md:h-10 text-[#f99e02]" strokeWidth={1.5} />
+          </motion.div>
+
+          {/* Step label */}
+          <motion.div
+            className="flex items-center gap-3 mb-3"
+            style={{
+              opacity: useTransform(scrollProgress, [start + 0.02, end], [0, 1]),
+            }}
+          >
+            <span className="text-[#f99e02]/60 text-sm font-mono font-bold tracking-widest">
+              PASO {String(step.id).padStart(2, '0')}
+            </span>
+            <div className="h-px flex-1 bg-gradient-to-r from-[#f99e02]/20 to-transparent" />
+          </motion.div>
+
+          {/* Title */}
+          <motion.h3
+            className="text-3xl md:text-4xl font-bold text-white mb-3 tracking-tight"
+            style={{
+              opacity: useTransform(scrollProgress, [start + 0.03, end], [0, 1]),
+              x: useTransform(scrollProgress, [start + 0.03, end], [20, 0]),
+            }}
+          >
+            {step.title}
+          </motion.h3>
+
+          {/* Description */}
+          <motion.p
+            className="text-base md:text-lg text-white/50 leading-relaxed max-w-sm"
+            style={{
+              opacity: useTransform(scrollProgress, [start + 0.05, end + 0.02], [0, 1]),
+              x: useTransform(scrollProgress, [start + 0.05, end + 0.02], [15, 0]),
+            }}
+          >
+            {step.desc}
+          </motion.p>
+
+          {/* Decorative corner accent */}
+          <div className="absolute bottom-0 right-0 w-24 h-24 pointer-events-none">
+            <div className="absolute bottom-4 right-4 w-8 h-px bg-gradient-to-l from-[#f99e02]/30 to-transparent" />
+            <div className="absolute bottom-4 right-4 w-px h-8 bg-gradient-to-t from-[#f99e02]/30 to-transparent" />
+          </div>
+        </div>
       </motion.div>
     </div>
   );

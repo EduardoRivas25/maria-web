@@ -9,6 +9,7 @@ import FilesPage from "./pages/FilesPage";
 import ProductivityPage from "./pages/ProductivityPage";
 import FinancesPage from "./pages/FinancesPage";
 import SettingsPage from "./pages/SettingsPage";
+import ClassroomPage from "./pages/ClassroomPage";
 
 export const router = createBrowserRouter([
   {
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <DashboardHome /> },
       { path: "tareas", element: <TasksPage /> },
+      { path: "clases", element: <ClassroomPage /> },
       { path: "calendario", element: <CalendarPage /> },
       { path: "correos", element: <EmailPage /> },
       { path: "archivos", element: <FilesPage /> },
