@@ -130,28 +130,31 @@ export default function DashboardHome() {
       </Card>
 
       {/* Weekly Productivity Chart */}
-      <Card className="lg:row-span-2">
+      <Card className="lg:row-span-2 flex flex-col">
         <CardHeader icon={TrendingUp} title="Productividad Semanal" />
-        <div className="h-[220px] sm:h-[280px] mt-2 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={mockWeeklyProductivity} barCategoryGap="20%">
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-              <XAxis
-                dataKey="day"
-                tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 12 }}
-                axisLine={{ stroke: "rgba(255,255,255,0.06)" }}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 12 }}
-                axisLine={false}
-                tickLine={false}
-              />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(249,158,2,0.05)" }} />
-              <Bar dataKey="tareas" name="Tareas" fill="#f99e02" radius={[6, 6, 0, 0]} />
-              <Bar dataKey="horas" name="Horas" fill="#f99e02" fillOpacity={0.3} radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="flex-1 mt-2 w-full min-h-[220px] sm:min-h-[280px] relative">
+          <div className="absolute inset-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={mockWeeklyProductivity} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+                <XAxis
+                  dataKey="day"
+                  tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 12 }}
+                  axisLine={{ stroke: "rgba(255,255,255,0.06)" }}
+                  tickLine={false}
+                  padding={{ left: 15, right: 15 }}
+                />
+                <YAxis
+                  tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 12 }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={40}
+                />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(249,158,2,0.05)" }} />
+                <Bar dataKey="tareas" name="Tareas Completadas" fill="#f99e02" radius={[6, 6, 0, 0]} barSize={28} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </Card>
 

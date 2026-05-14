@@ -59,7 +59,7 @@ export default function SignInPage({ onBack, onRegisterClick, onLogin }) {
                             <Input type="password" required name="pwd" id="pwd-signin" placeholder="••••••••" />
                         </div>
 
-                        <Button className="w-full bg-[#f99e02] hover:bg-[#e08e02] text-white font-semibold rounded-xl py-6 mt-2">
+                        <Button type="submit" className="w-full bg-[#f99e02] hover:bg-[#e08e02] text-white font-semibold rounded-xl py-6 mt-2">
                             Ingresar
                         </Button>
                     </div>

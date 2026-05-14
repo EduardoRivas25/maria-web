@@ -394,7 +394,8 @@ export default function ClassroomPage() {
                 />
               ) : (
                 <div 
-                  className={`text-6xl font-black font-mono tracking-wider tabular-nums transition-colors ${timerMode === 'focus' ? 'text-[#f99e02]' : 'text-emerald-400'}`}
+                  onClick={() => !isTimerRunning && handleEditClick()}
+                  className={`cursor-pointer text-6xl font-black font-mono tracking-wider tabular-nums transition-colors ${timerMode === 'focus' ? 'text-[#f99e02]' : 'text-emerald-400'}`}
                 >
                   {formatTime(timeLeft)}
                 </div>
@@ -403,10 +404,10 @@ export default function ClassroomPage() {
               {!isTimerRunning && !isEditingTime && (
                  <button 
                    onClick={handleEditClick}
-                   className="absolute top-0 right-4 md:right-10 p-2 text-white/20 hover:text-white/60 transition-colors opacity-0 group-hover:opacity-100 bg-white/5 rounded-full border-none cursor-pointer"
+                   className="absolute top-0 right-4 md:right-10 p-2 text-white/50 hover:text-white transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 bg-white/10 md:bg-white/5 rounded-full border-none cursor-pointer"
                    title="Editar Tiempo (ej. 0:30, 25:00)"
                  >
-                   <Edit2 size={14} />
+                   <Edit2 size={16} />
                  </button>
               )}
 

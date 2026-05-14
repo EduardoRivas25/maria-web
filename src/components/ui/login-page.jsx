@@ -70,7 +70,7 @@ export default function LoginPage({ onBack, onSignInClick, onLogin }) {
                             <Input type="password" required name="pwd" id="pwd" placeholder="••••••••" />
                         </div>
 
-                        <Button className="w-full bg-[#f99e02] hover:bg-[#e08e02] text-white font-semibold rounded-xl py-6 mt-2">
+                        <Button type="submit" className="w-full bg-[#f99e02] hover:bg-[#e08e02] text-white font-semibold rounded-xl py-6 mt-2">
                             Registrarse
                         </Button>
                     </div>
