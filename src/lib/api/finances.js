@@ -50,11 +50,42 @@ export const financesApi = {
     const { data: authData } = await insforge.auth.getCurrentUser();
     if (authData?.user) {
       const u = authData.user;
-      await insforge.database.from('profiles').insert({
-        id: u.id,
-        email: u.email || 'usuario@maria.app',
-        full_name: u.email?.split('@')[0] || 'Usuario'
-      }).then(() => {}).catch(() => {}); // ignore error if it already exists
+      const { data: profileCheck } = await insforge.database.from('profiles').select('id').eq('id', u.id).single();
+      if (!profileCheck) {
+        await insforge.database.from('profiles').insert({
+          id: u.id,
+          email: u.email || 'usuario@maria.app',
+          full_name: u.email?.split('@')[0] || 'Usuario'
+        });
+      }
+    }
+
+    // Check if category exists, if not, create it
+    let catId = transaction.categoryId || null;
+    if (!catId && transaction.category) {
+      const { data: existingCat } = await insforge.database
+        .from('categories')
+        .select('id')
+        .eq('name', transaction.category)
+        .eq('type', 'finance')
+        .eq('user_id', userId)
+        .single();
+        
+      if (existingCat) {
+        catId = existingCat.id;
+      } else {
+        const { data: newCat } = await insforge.database
+          .from('categories')
+          .insert({
+            user_id: userId,
+            name: transaction.category,
+            type: 'finance',
+            color: transaction.type === 'income' ? '#10b981' : '#ef4444'
+          })
+          .select('id')
+          .single();
+        if (newCat) catId = newCat.id;
+      }
     }
 
     const { data, error } = await insforge.database
@@ -64,7 +95,7 @@ export const financesApi = {
         type: transaction.type,
         amount: parseFloat(transaction.amount),
         category_name: transaction.category,
-        category_id: transaction.categoryId || null,
+        category_id: catId,
         description: transaction.description,
         date: transaction.date || new Date().toISOString().split('T')[0],
       })

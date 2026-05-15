@@ -3,6 +3,8 @@ import { motion } from "framer-motion";
 import { Clock, CheckSquare, TrendingUp, Flame, Loader2 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Line, LineChart, PieChart, Pie, Cell } from "recharts";
 import { analyticsApi } from "@/lib/api/analytics";
+import { isGitHubConnected, connectGitHub, disconnectGitHub, handleGitHubCallback, fetchGitHubContributions, getGitHubUsername } from "@/lib/github-auth";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.08 } } };
 const item = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
@@ -37,9 +39,29 @@ export default function ProductivityPage() {
   const [taskDistribution, setTaskDistribution] = useState([]);
   const [heatmapData, setHeatmapData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [ghLoading, setGhLoading] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    async function fetchAll() {
+    // Handle GitHub OAuth Callback
+    const searchParams = new URLSearchParams(location.search);
+    const code = searchParams.get('code');
+    if (code) {
+      setGhLoading(true);
+      handleGitHubCallback(code).then(() => {
+        // Remove code from URL
+        navigate('/dashboard/productividad', { replace: true });
+        setGhLoading(false);
+        fetchAll(); // Reload to fetch GH data
+      });
+      return;
+    }
+
+    fetchAll();
+  }, [location.search]);
+
+  async function fetchAll() {
       try {
         const [m, weekly, monthly, dist, heatmap] = await Promise.all([
           analyticsApi.getMetrics(),
@@ -48,19 +70,36 @@ export default function ProductivityPage() {
           analyticsApi.getTaskDistribution(),
           analyticsApi.getHeatmapData(140),
         ]);
+
+        let finalHeatmap = heatmap;
+
+        // Merge GitHub Data if connected
+        if (isGitHubConnected()) {
+          const ghUser = getGitHubUsername();
+          if (ghUser) {
+            const ghData = await fetchGitHubContributions(ghUser);
+            // Create a lookup for fast merging
+            const ghMap = {};
+            ghData.forEach(d => ghMap[d.date.split('T')[0]] = d.count);
+            
+            finalHeatmap = finalHeatmap.map(day => ({
+              ...day,
+              count: day.count + (ghMap[day.date] || 0)
+            }));
+          }
+        }
+
         setMetrics(m);
         setWeeklyData(weekly);
         setMonthlyActivity(monthly);
         setTaskDistribution(dist);
-        setHeatmapData(heatmap);
+        setHeatmapData(finalHeatmap);
       } catch (err) {
         console.error("[Productivity] Load error:", err);
       } finally {
         setLoading(false);
       }
     }
-    fetchAll();
-  }, []);
 
   // Build heatmap weeks
   const weeks = [];
@@ -143,7 +182,21 @@ export default function ProductivityPage() {
         {/* Heatmap */}
         <motion.div variants={item} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-white">Contribuciones</h3>
+            <div className="flex items-center gap-3">
+              <h3 className="text-sm font-semibold text-white">Contribuciones</h3>
+              {ghLoading ? (
+                <span className="text-[10px] text-white/40 flex items-center gap-1"><Loader2 size={10} className="animate-spin" /> Conectando...</span>
+              ) : isGitHubConnected() ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-md font-semibold">GitHub: {getGitHubUsername()}</span>
+                  <button onClick={disconnectGitHub} className="text-[10px] text-white/40 hover:text-red-400 bg-transparent border-none cursor-pointer">Desconectar</button>
+                </div>
+              ) : (
+                <button onClick={connectGitHub} className="text-[10px] text-white bg-white/10 hover:bg-white/20 px-2 py-0.5 rounded-md border-none cursor-pointer transition-colors">
+                  Conectar GitHub
+                </button>
+              )}
+            </div>
             <div className="flex items-center gap-1.5 text-[10px] text-white/30">
               <span>Menos</span>
               {[0, 2, 4, 6, 7].map((v) => <div key={v} className="w-3 h-3 rounded-sm" style={{ background: getHeatColor(v) }} />)}

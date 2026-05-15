@@ -12,7 +12,8 @@ import {
   Clock,
   Menu,
 } from "lucide-react";
-import { mockNotifications, mockUser } from "@/data/mockData";
+import { mockNotifications } from "@/data/mockData";
+import { useAuth } from "@/lib/auth";
 
 const pageTitles = {
   "/dashboard": "Inicio",
@@ -34,6 +35,7 @@ const notifIcons = {
 export default function Topbar({ isMobile, onOpenMobileMenu }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, profile, signOut } = useAuth();
   const [showNotifs, setShowNotifs] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const notifRef = useRef(null);
@@ -41,6 +43,10 @@ export default function Topbar({ isMobile, onOpenMobileMenu }) {
 
   const unreadCount = mockNotifications.filter((n) => !n.read).length;
   const currentTitle = pageTitles[location.pathname] || "Dashboard";
+
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || "Usuario";
+  const displayEmail = profile?.email || user?.email || "";
+  const initials = displayName.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2) || "U";
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -52,8 +58,12 @@ export default function Topbar({ isMobile, onOpenMobileMenu }) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const handleLogout = () => {
-    navigate("/");
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
   };
 
   return (
@@ -157,9 +167,9 @@ export default function Topbar({ isMobile, onOpenMobileMenu }) {
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#f99e02] to-[#e08e02]
                             flex items-center justify-center text-white text-xs font-bold
                             shadow-[0_0_15px_rgba(249,158,2,0.2)]">
-              {mockUser.initials}
+              {initials}
             </div>
-            <span className="text-sm text-white/70 font-medium hidden md:block">{mockUser.name}</span>
+            <span className="text-sm text-white/70 font-medium hidden md:block">{displayName}</span>
           </button>
 
           <AnimatePresence>
@@ -173,8 +183,8 @@ export default function Topbar({ isMobile, onOpenMobileMenu }) {
                            bg-[#141414] shadow-2xl overflow-hidden"
               >
                 <div className="px-4 py-3 border-b border-white/5">
-                  <p className="text-sm font-semibold text-white">{mockUser.name}</p>
-                  <p className="text-xs text-white/40 mt-0.5">{mockUser.email}</p>
+                  <p className="text-sm font-semibold text-white">{displayName}</p>
+                  <p className="text-xs text-white/40 mt-0.5">{displayEmail}</p>
                 </div>
                 <div className="py-1">
                   {[
