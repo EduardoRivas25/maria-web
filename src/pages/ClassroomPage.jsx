@@ -1,66 +1,36 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  BookOpen, Clock, AlertCircle, CheckCircle2, ChevronRight, 
-  FileText, Bell, X, Play, Pause, RotateCcw, BrainCircuit, Timer,
-  Check, Edit2, Users
+  BookOpen, Clock, AlertCircle, CheckCircle2, 
+  FileText, X, Play, Pause, RotateCcw, BrainCircuit, Timer,
+  Check, Edit2, Users, Loader2
 } from "lucide-react";
+import { classroomApi } from "@/lib/api/classroom";
+import { isGoogleConnected } from "@/lib/google-auth";
+import GoogleConnectPrompt from "@/components/GoogleConnectPrompt";
 
 // Helper for today
 const todayStr = new Date().toISOString().split('T')[0];
 
-// Mock Data
-const enrolledClasses = [
-  { id: "all", name: "Todas las Clases", teacher: "", color: "from-white/10 to-white/5", border: "border-white/10", icon: BookOpen },
-  { id: "c1", name: "Tecnología Educativa", teacher: "Dra. Elena Silva", color: "from-blue-500/20 to-blue-900/10", border: "border-blue-500/30", icon: Users },
-  { id: "c2", name: "Desarrollo Frontend", teacher: "Ing. Carlos Mendoza", color: "from-[#f99e02]/20 to-[#f99e02]/5", border: "border-[#f99e02]/30", icon: FileText },
-  { id: "c3", name: "Historia Contemporánea", teacher: "Lic. Andrea Rojas", color: "from-emerald-500/20 to-emerald-900/10", border: "border-emerald-500/30", icon: BookOpen },
-];
-
-const initialTasks = [
-  { 
-    id: 1, 
-    classId: "c1",
-    title: "Ensayo Final: IA en la Educación", 
-    course: "Tecnología Educativa", 
-    dueDate: todayStr, // Se entrega hoy
-    status: "pending", 
-    type: "essay",
-    description: "Escribir un ensayo de 5 cuartillas sobre el impacto de la inteligencia artificial en los métodos de enseñanza modernos. Incluir al menos 3 referencias bibliográficas en formato APA.",
-    estimatedTime: "2 horas",
-    progress: 30
-  },
-  { 
-    id: 2, 
-    classId: "c2",
-    title: "Práctica 4: React y Framer Motion", 
-    course: "Desarrollo Frontend", 
-    dueDate: "2026-05-19", 
-    status: "pending", 
-    type: "code",
-    description: "Implementar animaciones complejas en la interfaz de usuario utilizando la biblioteca Framer Motion. Garantizar que la interfaz sea responsiva y los componentes sean reutilizables.",
-    estimatedTime: "3 horas",
-    progress: 0
-  },
-  { 
-    id: 3, 
-    classId: "c3",
-    title: "Lectura: Capítulo 5", 
-    course: "Historia Contemporánea", 
-    dueDate: "2026-05-15", 
-    status: "completed", 
-    type: "reading",
-    description: "Leer el capítulo 5 del libro base y preparar un mapa conceptual con las ideas principales y eventos históricos destacados.",
-    estimatedTime: "45 mins",
-    progress: 100
-  },
+const classColors = [
+  { color: "from-blue-500/20 to-blue-900/10", border: "border-blue-500/30", icon: Users },
+  { color: "from-[#f99e02]/20 to-[#f99e02]/5", border: "border-[#f99e02]/30", icon: FileText },
+  { color: "from-emerald-500/20 to-emerald-900/10", border: "border-emerald-500/30", icon: BookOpen },
+  { color: "from-purple-500/20 to-purple-900/10", border: "border-purple-500/30", icon: Users },
+  { color: "from-pink-500/20 to-pink-900/10", border: "border-pink-500/30", icon: BookOpen },
 ];
 
 export default function ClassroomPage() {
-  const [tasks, setTasks] = useState(initialTasks);
+  const [tasks, setTasks] = useState([]);
+  const [enrolledClasses, setEnrolledClasses] = useState([
+    { id: "all", name: "Todas las Clases", teacher: "", color: "from-white/10 to-white/5", border: "border-white/10", icon: BookOpen }
+  ]);
   const [selectedTask, setSelectedTask] = useState(null);
   const [activeClassFilter, setActiveClassFilter] = useState("all");
   const [timeFilter, setTimeFilter] = useState("all"); // 'all' | 'today'
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [needsGoogle, setNeedsGoogle] = useState(!isGoogleConnected());
   
   // Pomodoro Timer State
   const [timeLeft, setTimeLeft] = useState(25 * 60);
@@ -69,39 +39,88 @@ export default function ClassroomPage() {
   const [isEditingTime, setIsEditingTime] = useState(false);
   const [inputTime, setInputTime] = useState("25:00");
 
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // 1. Fetch courses
+      const coursesRes = await classroomApi.getCourses();
+      const mappedCourses = coursesRes.map((c, i) => {
+        const style = classColors[i % classColors.length];
+        return {
+          id: c.id,
+          name: c.name,
+          teacher: c.section || '',
+          color: style.color,
+          border: style.border,
+          icon: style.icon
+        };
+      });
+
+      setEnrolledClasses([
+        { id: "all", name: "Todas las Clases", teacher: "", color: "from-white/10 to-white/5", border: "border-white/10", icon: BookOpen },
+        ...mappedCourses
+      ]);
+
+      // 2. Fetch all coursework
+      const allWork = await classroomApi.getAllCoursework();
+      
+      const mappedTasks = allWork.map(w => {
+        let dueDate = null;
+        if (w.dueDate) {
+          dueDate = new Date(w.dueDate.year, w.dueDate.month - 1, w.dueDate.day).toISOString().split('T')[0];
+        }
+
+        return {
+          id: w.id,
+          classId: w.courseId,
+          title: w.title,
+          course: w.courseName,
+          dueDate,
+          status: 'pending', // Would need submissions API to check true status
+          description: w.description || 'Sin descripción',
+          estimatedTime: '1 hora', // Mocked estimation
+          progress: 0,
+          alternateLink: w.alternateLink
+        };
+      });
+
+      setTasks(mappedTasks);
+    } catch (err) {
+      console.error("[Classroom] Load error:", err);
+      if (err.message === 'NO_GOOGLE_TOKEN') {
+        setNeedsGoogle(true);
+      } else {
+        setError('Error al cargar datos de Google Classroom: ' + (err.message || JSON.stringify(err)));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!needsGoogle) fetchData();
+  }, [fetchData, needsGoogle]);
+
   const playAlarm = () => {
     try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        
-        // Helper to play a single bell-like tone
         const playNote = (frequency, startTime, duration) => {
             const osc = audioCtx.createOscillator();
             const gainNode = audioCtx.createGain();
-            
             osc.connect(gainNode);
             gainNode.connect(audioCtx.destination);
-            
-            osc.type = 'sine'; // Clean bell-like sound
+            osc.type = 'sine';
             osc.frequency.setValueAtTime(frequency, startTime);
-            
-            // Percussive envelope: fast attack, smooth exponential decay
             gainNode.gain.setValueAtTime(0, startTime);
             gainNode.gain.linearRampToValueAtTime(0.5, startTime + 0.02);
             gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-            
             osc.start(startTime);
             osc.stop(startTime + duration);
         };
-
         const now = audioCtx.currentTime;
-        
-        // Modern "Chime" (Similar to Apple/Google notifications)
-        // Plays a quick, glassy major chord sequence
-        // 1st chime
         playNote(1046.50, now, 0.6); // C6
         playNote(1318.51, now, 0.6); // E6
-        
-        // 2nd chime (slightly higher and delayed)
         playNote(1318.51, now + 0.15, 1.0); // E6
         playNote(1567.98, now + 0.15, 1.0); // G6
     } catch (e) {
@@ -141,21 +160,15 @@ export default function ClassroomPage() {
   };
 
   const handleSaveTime = () => {
-    // Parse input like "1:30" or "0:45" or decimal like "1.5" or just seconds if less than 60?
     let totalSeconds = 0;
-    
     if (inputTime.includes(':')) {
         const parts = inputTime.split(':');
         totalSeconds = parseInt(parts[0] || '0', 10) * 60 + parseInt(parts[1] || '0', 10);
     } else {
         const val = parseFloat(inputTime);
         if (val < 60 && !inputTime.includes('.')) {
-            // If they type a small integer like "30" they probably mean 30 minutes, 
-            // but if they want seconds they can write 0:30
-            // Let's assume input without colon is minutes to avoid confusion.
             totalSeconds = val * 60;
         } else {
-            // Decimal minutes like 0.5 -> 30s
             totalSeconds = val * 60;
         }
     }
@@ -164,7 +177,6 @@ export default function ClassroomPage() {
       setTimeLeft(Math.floor(totalSeconds));
       setInputTime(formatTime(Math.floor(totalSeconds)));
     } else {
-      // Revert to current time
       setInputTime(formatTime(timeLeft));
     }
     setIsEditingTime(false);
@@ -201,12 +213,43 @@ export default function ClassroomPage() {
       setInputTime(formatTime(timeLeft));
   };
 
-  // Filter tasks
   const filteredTasks = tasks.filter(t => {
       const matchClass = activeClassFilter === "all" || t.classId === activeClassFilter;
       const matchTime = timeFilter === "all" || (timeFilter === "today" && t.dueDate === todayStr);
       return matchClass && matchTime;
   });
+
+  if (needsGoogle) {
+    return (
+      <div className="max-w-[1400px] py-20">
+        <GoogleConnectPrompt
+          serviceName="Google Classroom"
+          onConnected={() => { setNeedsGoogle(false); setLoading(true); fetchData(); }}
+        />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-[1400px]">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-8 flex flex-col items-center justify-center text-center">
+          <AlertCircle size={32} className="text-red-400 mb-3" />
+          <p className="text-red-400 font-medium mb-1">No se pudo conectar a Google Classroom</p>
+          <p className="text-sm text-red-400/70">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="max-w-[1400px] flex flex-col items-center justify-center py-20">
+        <Loader2 size={32} className="text-[#f99e02] animate-spin mb-4" />
+        <p className="text-white/40 text-sm">Cargando clases y tareas...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-[1400px] space-y-6 pb-12 relative">
@@ -219,7 +262,7 @@ export default function ClassroomPage() {
         <p className="text-white/50 text-sm">Gestiona tus clases inscritas, tareas y sesiones de estudio.</p>
       </div>
 
-      {/* Clases Inscritas (Google Classroom Style) */}
+      {/* Clases Inscritas */}
       <div className="mb-8">
         <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
             <Users size={18} className="text-[#f99e02]" />
@@ -227,7 +270,7 @@ export default function ClassroomPage() {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {enrolledClasses.map((cls) => {
-                const Icon = cls.icon;
+                const Icon = cls.icon || BookOpen;
                 const isActive = activeClassFilter === cls.id;
                 return (
                     <motion.div
@@ -248,8 +291,8 @@ export default function ClassroomPage() {
                         <div className="p-5 h-full flex flex-col justify-between bg-black/40 backdrop-blur-sm hover:bg-black/20 transition-colors">
                             <div>
                                 <Icon size={24} className="text-white/70 mb-3" />
-                                <h3 className="text-white font-bold text-lg leading-tight mb-1">{cls.name}</h3>
-                                {cls.teacher && <p className="text-white/50 text-xs">{cls.teacher}</p>}
+                                <h3 className="text-white font-bold text-lg leading-tight mb-1 truncate" title={cls.name}>{cls.name}</h3>
+                                {cls.teacher && <p className="text-white/50 text-xs truncate" title={cls.teacher}>{cls.teacher}</p>}
                             </div>
                         </div>
                     </motion.div>
@@ -273,7 +316,6 @@ export default function ClassroomPage() {
                 {activeClassFilter === "all" ? "Todas las Tareas" : "Tareas de la Clase"}
               </h2>
 
-              {/* Filtro de Tiempo (Hoy vs Todas) */}
               <div className="flex items-center gap-1 bg-white/5 p-1 rounded-lg">
                 <button 
                     onClick={() => setTimeFilter('all')}
@@ -290,7 +332,7 @@ export default function ClassroomPage() {
               </div>
             </div>
             
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
               {filteredTasks.length === 0 ? (
                  <div className="py-12 text-center text-white/30 border border-white/5 border-dashed rounded-xl">
                     <CheckCircle2 size={32} className="mx-auto mb-3 opacity-20" />
@@ -302,11 +344,10 @@ export default function ClassroomPage() {
                     key={task.id}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.3, delay: index * 0.1 }}
+                    transition={{ duration: 0.3, delay: Math.min(index * 0.05, 0.5) }}
                     onClick={() => setSelectedTask(task)}
                     className="group flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.05] hover:border-[#f99e02]/30 transition-all duration-300 cursor-pointer relative overflow-hidden"
                   >
-                    {/* Progress background bar */}
                     {task.status !== 'completed' && task.progress > 0 && (
                       <div 
                           className="absolute left-0 bottom-0 h-1 bg-[#f99e02]/30 transition-all duration-500" 
@@ -319,26 +360,27 @@ export default function ClassroomPage() {
                     </div>
                     
                     <div className="flex-1 min-w-0">
-                      <h3 className={`text-sm md:text-base font-semibold truncate transition-colors ${task.status === 'completed' ? 'text-white/40 line-through' : 'text-white/90 group-hover:text-white'}`}>
+                      <h3 className={`text-sm md:text-base font-semibold truncate transition-colors ${task.status === 'completed' ? 'text-white/40 line-through' : 'text-white/90 group-hover:text-white'}`} title={task.title}>
                         {task.title}
                       </h3>
                       <div className="flex items-center gap-3 mt-1.5">
                           <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-white/5 text-white/50 truncate max-w-[150px]">
                               {task.course}
                           </span>
-                          <div className="flex items-center gap-1.5 text-xs text-white/40">
-                              <Timer size={12} />
-                              <span>{task.estimatedTime}</span>
-                          </div>
                       </div>
                     </div>
                     
                     <div className="flex items-center justify-between sm:justify-end gap-4 mt-2 sm:mt-0">
-                      <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white/60 ${task.dueDate === todayStr ? 'bg-[#f99e02]/20 text-[#f99e02]' : 'bg-black/20'}`}>
-                          <Clock size={14} />
-                          <span className="text-xs font-medium">
-                              {task.dueDate === todayStr ? 'Hoy' : new Date(task.dueDate).toLocaleDateString("es-MX", { day: "numeric", month: "short" })}
-                          </span>
+                      <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-white/60 ${task.dueDate === todayStr ? 'bg-[#f99e02]/20 text-[#f99e02]' : task.dueDate ? 'bg-black/20' : 'bg-transparent'}`}>
+                          {task.dueDate && (
+                            <>
+                              <Clock size={14} />
+                              <span className="text-xs font-medium">
+                                  {task.dueDate === todayStr ? 'Hoy' : new Date(task.dueDate).toLocaleDateString("es-MX", { day: "numeric", month: "short" })}
+                              </span>
+                            </>
+                          )}
+                          {!task.dueDate && <span className="text-xs text-white/30">Sin fecha</span>}
                       </div>
                     </div>
                   </motion.div>
@@ -350,14 +392,12 @@ export default function ClassroomPage() {
 
         {/* Right Column: Pomodoro */}
         <div className="space-y-6">
-          {/* Sesión de Enfoque (Productivity Timer) */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.1 }}
             className="bg-gradient-to-br from-[#1a1305] to-[#0a0a0b] border border-[#f99e02]/20 rounded-2xl p-6 relative overflow-hidden sticky top-6"
           >
-            {/* Background Glow */}
             <div className="absolute -top-10 -right-10 w-32 h-32 bg-[#f99e02]/10 blur-3xl rounded-full pointer-events-none" />
 
             <div className="flex items-center gap-2 mb-6">
@@ -454,7 +494,6 @@ export default function ClassroomPage() {
               onClick={(e) => e.stopPropagation()}
               className="w-full max-w-lg bg-[#111111] border border-white/10 rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
             >
-              {/* Modal Header */}
               <div className="p-6 border-b border-white/5 flex justify-between items-start bg-white/[0.02]">
                 <div className="pr-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -479,11 +518,10 @@ export default function ClassroomPage() {
                 </button>
               </div>
               
-              {/* Modal Body */}
               <div className="p-6 overflow-y-auto space-y-6 flex-1 custom-scrollbar">
                 <div>
                     <h4 className="text-xs font-medium text-white/40 uppercase tracking-wider mb-2">Descripción</h4>
-                    <p className="text-sm text-white/80 leading-relaxed">
+                    <p className="text-sm text-white/80 leading-relaxed whitespace-pre-wrap">
                         {selectedTask.description}
                     </p>
                 </div>
@@ -493,20 +531,21 @@ export default function ClassroomPage() {
                         <Clock className="text-[#f99e02] mb-2" size={20} />
                         <span className="text-xs text-white/40 mb-1">Fecha de Entrega</span>
                         <span className="text-sm font-semibold text-white/90">
-                            {selectedTask.dueDate === todayStr ? 'Hoy' : new Date(selectedTask.dueDate).toLocaleDateString("es-MX", { weekday: 'long', day: 'numeric', month: 'long' })}
+                            {selectedTask.dueDate === todayStr ? 'Hoy' : selectedTask.dueDate ? new Date(selectedTask.dueDate).toLocaleDateString("es-MX", { weekday: 'long', day: 'numeric', month: 'long' }) : 'Sin fecha límite'}
                         </span>
                     </div>
-                    <div className="bg-black/20 border border-white/5 rounded-xl p-4 flex flex-col items-center justify-center text-center">
-                        <Timer className="text-[#f99e02] mb-2" size={20} />
-                        <span className="text-xs text-white/40 mb-1">Tiempo Estimado</span>
-                        <span className="text-sm font-semibold text-white/90">
-                            {selectedTask.estimatedTime}
-                        </span>
-                    </div>
+                    {selectedTask.alternateLink && (
+                      <div className="bg-black/20 border border-white/5 rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-white/5 transition-colors" onClick={() => window.open(selectedTask.alternateLink, '_blank')}>
+                          <BookOpen className="text-[#f99e02] mb-2" size={20} />
+                          <span className="text-xs text-white/40 mb-1">Ver en Classroom</span>
+                          <span className="text-sm font-semibold text-white/90">
+                              Abrir enlace
+                          </span>
+                      </div>
+                    )}
                 </div>
               </div>
 
-              {/* Modal Footer */}
               <div className="p-6 border-t border-white/5 bg-black/20 flex flex-col sm:flex-row gap-3">
                 <button 
                     onClick={() => toggleTaskStatus(selectedTask.id)}

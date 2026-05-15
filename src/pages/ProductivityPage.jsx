@@ -1,7 +1,8 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Clock, CheckSquare, TrendingUp, Flame, Calendar } from "lucide-react";
+import { Clock, CheckSquare, TrendingUp, Flame, Loader2 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Line, LineChart, PieChart, Pie, Cell } from "recharts";
-import { mockWeeklyProductivity, mockTaskDistribution, mockMonthlyActivity, mockHeatmapData, mockProductivityMetrics } from "@/data/mockData";
+import { analyticsApi } from "@/lib/api/analytics";
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.08 } } };
 const item = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
@@ -30,11 +31,40 @@ function MetricCard({ icon: Icon, label, value, sub, color }) {
 }
 
 export default function ProductivityPage() {
-  const m = mockProductivityMetrics;
-  // Build heatmap - last 20 weeks (140 days)
-  const heatmap = mockHeatmapData.slice(-140);
+  const [metrics, setMetrics] = useState({ hoursToday: 0, tasksCompleted: 0, dailyAverage: 0, streak: 0 });
+  const [weeklyData, setWeeklyData] = useState([]);
+  const [monthlyActivity, setMonthlyActivity] = useState([]);
+  const [taskDistribution, setTaskDistribution] = useState([]);
+  const [heatmapData, setHeatmapData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchAll() {
+      try {
+        const [m, weekly, monthly, dist, heatmap] = await Promise.all([
+          analyticsApi.getMetrics(),
+          analyticsApi.getWeeklyProductivity(),
+          analyticsApi.getMonthlyActivity(),
+          analyticsApi.getTaskDistribution(),
+          analyticsApi.getHeatmapData(140),
+        ]);
+        setMetrics(m);
+        setWeeklyData(weekly);
+        setMonthlyActivity(monthly);
+        setTaskDistribution(dist);
+        setHeatmapData(heatmap);
+      } catch (err) {
+        console.error("[Productivity] Load error:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchAll();
+  }, []);
+
+  // Build heatmap weeks
   const weeks = [];
-  for (let i = 0; i < heatmap.length; i += 7) weeks.push(heatmap.slice(i, i + 7));
+  for (let i = 0; i < heatmapData.length; i += 7) weeks.push(heatmapData.slice(i, i + 7));
 
   const getHeatColor = (count) => {
     if (count === 0) return "rgba(255,255,255,0.03)";
@@ -44,14 +74,25 @@ export default function ProductivityPage() {
     return "rgba(249,158,2,0.8)";
   };
 
+  if (loading) {
+    return (
+      <div className="max-w-[1400px] flex items-center justify-center py-20">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 size={24} className="text-[#f99e02] animate-spin" />
+          <p className="text-white/40 text-sm">Cargando productividad...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="max-w-[1400px] space-y-6">
       {/* Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard icon={Clock} label="Horas productivas" value={`${m.hoursToday}h`} sub="Hoy" color="#3b82f6" />
-        <MetricCard icon={CheckSquare} label="Tareas completadas" value={m.tasksCompleted} sub="Este mes" color="#10b981" />
-        <MetricCard icon={TrendingUp} label="Promedio diario" value={`${m.dailyAverage}h`} sub="Últimos 30 días" color="#f99e02" />
-        <MetricCard icon={Flame} label="Racha" value={`${m.streak} días`} sub="¡Sigue así! 🔥" color="#ef4444" />
+        <MetricCard icon={Clock} label="Actividad hoy" value={`${metrics.hoursToday}`} sub="Acciones registradas" color="#3b82f6" />
+        <MetricCard icon={CheckSquare} label="Tareas completadas" value={metrics.tasksCompleted} sub="Últimos 30 días" color="#10b981" />
+        <MetricCard icon={TrendingUp} label="Promedio diario" value={`${metrics.dailyAverage}`} sub="Tareas/día (30 días)" color="#f99e02" />
+        <MetricCard icon={Flame} label="Racha" value={`${metrics.streak} días`} sub={metrics.streak > 0 ? "¡Sigue así! 🔥" : "Empieza hoy"} color="#ef4444" />
       </div>
 
       {/* Charts Row */}
@@ -60,32 +101,40 @@ export default function ProductivityPage() {
         <motion.div variants={item} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
           <h3 className="text-sm font-semibold text-white mb-4">Tareas completadas por día</h3>
           <div className="h-[240px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={mockWeeklyProductivity}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                <XAxis dataKey="day" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 12 }} axisLine={{ stroke: "rgba(255,255,255,0.06)" }} tickLine={false} />
-                <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 12 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="tareas" name="Tareas" fill="#f99e02" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {weeklyData.some(d => d.tareas > 0) ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={weeklyData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                  <XAxis dataKey="day" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 12 }} axisLine={{ stroke: "rgba(255,255,255,0.06)" }} tickLine={false} />
+                  <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="tareas" name="Tareas" fill="#f99e02" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-white/20 text-sm">Completa tareas para ver estadísticas</div>
+            )}
           </div>
         </motion.div>
 
-        {/* Line Chart - Weekly activity */}
+        {/* Line Chart - Monthly activity */}
         <motion.div variants={item} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
           <h3 className="text-sm font-semibold text-white mb-4">Actividad mensual</h3>
           <div className="h-[240px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={mockMonthlyActivity}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                <XAxis dataKey="week" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 12 }} axisLine={{ stroke: "rgba(255,255,255,0.06)" }} tickLine={false} />
-                <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 12 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Line type="monotone" dataKey="completadas" name="Completadas" stroke="#f99e02" strokeWidth={2.5} dot={{ r: 4, fill: "#f99e02" }} />
-                <Line type="monotone" dataKey="creadas" name="Creadas" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4, fill: "#3b82f6" }} strokeDasharray="5 5" />
-              </LineChart>
-            </ResponsiveContainer>
+            {monthlyActivity.some(d => d.completadas > 0 || d.creadas > 0) ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={monthlyActivity}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                  <XAxis dataKey="week" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 12 }} axisLine={{ stroke: "rgba(255,255,255,0.06)" }} tickLine={false} />
+                  <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Line type="monotone" dataKey="completadas" name="Completadas" stroke="#f99e02" strokeWidth={2.5} dot={{ r: 4, fill: "#f99e02" }} />
+                  <Line type="monotone" dataKey="creadas" name="Creadas" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4, fill: "#3b82f6" }} strokeDasharray="5 5" />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-white/20 text-sm">Sin actividad registrada aún</div>
+            )}
           </div>
         </motion.div>
       </div>
@@ -116,17 +165,21 @@ export default function ProductivityPage() {
         <motion.div variants={item} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
           <h3 className="text-sm font-semibold text-white mb-4">Distribución de tareas</h3>
           <div className="h-[200px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={mockTaskDistribution} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={4} dataKey="value">
-                  {mockTaskDistribution.map((entry) => <Cell key={entry.name} fill={entry.color} stroke="transparent" />)}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
+            {taskDistribution.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={taskDistribution} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={4} dataKey="value">
+                    {taskDistribution.map((entry) => <Cell key={entry.name} fill={entry.color} stroke="transparent" />)}
+                  </Pie>
+                  <Tooltip content={<CustomTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-white/20 text-sm">Crea tareas para ver distribución</div>
+            )}
           </div>
           <div className="flex flex-wrap gap-3 mt-2 justify-center">
-            {mockTaskDistribution.map((d) => (
+            {taskDistribution.map((d) => (
               <div key={d.name} className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full" style={{ background: d.color }} />
                 <span className="text-[11px] text-white/40">{d.name}</span>

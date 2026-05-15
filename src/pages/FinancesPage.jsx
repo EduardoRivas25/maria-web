@@ -1,379 +1,273 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { DollarSign, TrendingUp, TrendingDown, Target, ArrowUpRight, ArrowDownRight, Plus, X } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, Line, LineChart, PieChart, Pie, Cell } from "recharts";
-import { mockTransactions, mockFinancialGoals } from "@/data/mockData";
+import { DollarSign, TrendingUp, TrendingDown, Wallet, Plus, X, Target, Loader2 } from "lucide-react";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { financesApi } from "@/lib/api/finances";
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.08 } } };
 const item = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
-
-const CHART_COLORS = ["#f99e02", "#3b82f6", "#8b5cf6", "#ef4444", "#10b981", "#ec4899", "#14b8a6", "#eab308"];
 
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload) return null;
   return (
     <div className="bg-[#1a1a1b] border border-white/10 rounded-xl px-3 py-2 shadow-xl">
       <p className="text-xs text-white/50 mb-1">{label}</p>
-      {payload.map((e, i) => <p key={i} className="text-xs font-semibold" style={{ color: e.color }}>{e.name}: ${e.value.toLocaleString()}</p>)}
+      {payload.map((e, i) => (
+        <p key={i} className="text-xs font-semibold" style={{ color: e.color }}>{e.name}: ${e.value?.toLocaleString()}</p>
+      ))}
     </div>
   );
 }
 
 export default function FinancesPage() {
-  const [transactions, setTransactions] = useState(mockTransactions);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  
-  // Form state
-  const [formData, setFormData] = useState({
-    type: "expense",
-    amount: "",
-    category: "",
-    description: "",
-    date: new Date().toISOString().split("T")[0]
-  });
+  const [transactions, setTransactions] = useState([]);
+  const [summary, setSummary] = useState({ income: 0, expense: 0, balance: 0 });
+  const [monthlyData, setMonthlyData] = useState([]);
+  const [expensesByCategory, setExpensesByCategory] = useState([]);
+  const [goals, setGoals] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [newTx, setNewTx] = useState({ type: "expense", amount: "", category: "", description: "", date: "" });
 
-  const totalIncome = transactions.filter((t) => t.type === "income").reduce((a, b) => a + b.amount, 0);
-  const totalExpense = transactions.filter((t) => t.type === "expense").reduce((a, b) => a + b.amount, 0);
-  const balance = totalIncome - totalExpense;
+  const fetchAll = useCallback(async () => {
+    try {
+      const [txs, sum, monthly, byCat, gls, cats] = await Promise.all([
+        financesApi.getTransactions({ limit: 15 }),
+        financesApi.getSummary(),
+        financesApi.getMonthlyData(),
+        financesApi.getExpensesByCategory(),
+        financesApi.getGoals(),
+        financesApi.getCategories(),
+      ]);
+      setTransactions(txs);
+      setSummary(sum);
+      setMonthlyData(monthly.filter(m => m.ingresos > 0 || m.gastos > 0));
+      setExpensesByCategory(byCat);
+      setGoals(gls);
+      setCategories(cats);
+    } catch (err) {
+      console.error("[Finances] Load error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const expensesByCategory = useMemo(() => {
-    return transactions
-      .filter(t => t.type === 'expense')
-      .reduce((acc, curr) => {
-        const existing = acc.find(item => item.name === curr.category);
-        if (existing) {
-          existing.value += curr.amount;
-        } else {
-          acc.push({ name: curr.category, value: curr.amount, color: CHART_COLORS[acc.length % CHART_COLORS.length] });
-        }
-        return acc;
-      }, []);
-  }, [transactions]);
+  useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const monthlyFinances = useMemo(() => {
-    const data = transactions.reduce((acc, curr) => {
-      const date = new Date(curr.date);
-      // Adjust date to local timezone to avoid off-by-one errors with UTC
-      const localDate = new Date(date.getTime() + date.getTimezoneOffset() * 60000);
-      const monthNames = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
-      const month = monthNames[localDate.getMonth()];
-      
-      let existing = acc.find(item => item.month === month);
-      if (!existing) {
-        existing = { month, ingresos: 0, gastos: 0, monthNum: localDate.getMonth() };
-        acc.push(existing);
-      }
-      if (curr.type === 'income') existing.ingresos += curr.amount;
-      if (curr.type === 'expense') existing.gastos += curr.amount;
-      return acc;
-    }, []);
-    return data.sort((a, b) => a.monthNum - b.monthNum);
-  }, [transactions]);
-
-  const handleSubmit = (e) => {
+  async function handleCreateTransaction(e) {
     e.preventDefault();
-    if (!formData.amount || !formData.category || !formData.description || !formData.date) return;
+    setSaving(true);
+    try {
+      await financesApi.createTransaction({
+        type: newTx.type,
+        amount: newTx.amount,
+        category: newTx.category,
+        description: newTx.description,
+        date: newTx.date || undefined,
+      });
+      setNewTx({ type: "expense", amount: "", category: "", description: "", date: "" });
+      setShowModal(false);
+      fetchAll();
+    } catch (err) {
+      console.error("[Finances] Create error:", err);
+    } finally {
+      setSaving(false);
+    }
+  }
 
-    const newTransaction = {
-      id: `tr${Date.now()}`,
-      type: formData.type,
-      amount: parseFloat(formData.amount),
-      category: formData.category,
-      date: formData.date,
-      description: formData.description
-    };
-
-    setTransactions([newTransaction, ...transactions].sort((a, b) => new Date(b.date) - new Date(a.date)));
-    setIsModalOpen(false);
-    setFormData({
-      type: "expense",
-      amount: "",
-      category: "",
-      description: "",
-      date: new Date().toISOString().split("T")[0]
-    });
-  };
+  if (loading) {
+    return (
+      <div className="max-w-[1400px] flex items-center justify-center py-20">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 size={24} className="text-[#f99e02] animate-spin" />
+          <p className="text-white/40 text-sm">Cargando finanzas...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="relative">
-      <motion.div variants={container} initial="hidden" animate="show" className="max-w-[1400px] space-y-6">
-        
-        {/* Header with Action */}
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white">Finanzas</h2>
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl transition-colors text-sm font-medium"
-          >
-            <Plus size={16} />
-            Nueva Transacción
-          </button>
-        </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            { label: "Ingresos totales", value: totalIncome, icon: TrendingUp, color: "#10b981" },
-            { label: "Gastos totales", value: totalExpense, icon: TrendingDown, color: "#ef4444" },
-            { label: "Balance actual", value: balance, icon: DollarSign, color: balance >= 0 ? "#10b981" : "#ef4444" },
-          ].map((c) => (
-            <motion.div key={c.label} variants={item} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:border-white/10 transition-all">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl" style={{ background: `${c.color}15` }}><c.icon size={16} style={{ color: c.color }} /></div>
-                  <span className="text-xs text-white/40 font-medium">{c.label}</span>
-                </div>
+    <motion.div variants={container} initial="hidden" animate="show" className="max-w-[1400px] space-y-6">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[
+          { icon: Wallet, label: "Balance", value: `$${summary.balance.toLocaleString()}`, color: "#f99e02", sub: "Este mes" },
+          { icon: TrendingUp, label: "Ingresos", value: `$${summary.income.toLocaleString()}`, color: "#10b981", sub: "Total ingresos" },
+          { icon: TrendingDown, label: "Gastos", value: `$${summary.expense.toLocaleString()}`, color: "#ef4444", sub: "Total gastos" },
+        ].map((card) => (
+          <motion.div key={card.label} variants={item} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:border-white/10 transition-all duration-300">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2.5 rounded-xl" style={{ background: `${card.color}15` }}>
+                <card.icon size={18} style={{ color: card.color }} />
               </div>
-              <p className="text-2xl font-bold" style={{ color: c.color }}>${c.value.toLocaleString()}</p>
-            </motion.div>
-          ))}
-        </div>
+              <span className="text-xs text-white/40 font-medium">{card.label}</span>
+            </div>
+            <p className="text-2xl font-bold text-white">{card.value}</p>
+            <p className="text-xs text-white/30 mt-1">{card.sub}</p>
+          </motion.div>
+        ))}
+      </div>
 
-        {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {/* Bar: Income vs Expenses */}
-          <motion.div variants={item} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-            <h3 className="text-sm font-semibold text-white mb-4">Ingresos vs Gastos</h3>
-            <div className="h-[240px]">
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Bar Chart — Income vs Expenses */}
+        <motion.div variants={item} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+          <h3 className="text-sm font-semibold text-white mb-4">Ingresos vs Gastos</h3>
+          <div className="h-[240px]">
+            {monthlyData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={monthlyFinances}>
+                <BarChart data={monthlyData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
                   <XAxis dataKey="month" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 12 }} axisLine={{ stroke: "rgba(255,255,255,0.06)" }} tickLine={false} />
                   <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 12 }} axisLine={false} tickLine={false} />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar dataKey="ingresos" name="Ingresos" fill="#10b981" radius={[6, 6, 0, 0]} />
-                  <Bar dataKey="gastos" name="Gastos" fill="#ef4444" radius={[6, 6, 0, 0]} fillOpacity={0.7} />
+                  <Bar dataKey="gastos" name="Gastos" fill="#ef4444" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
-          </motion.div>
+            ) : (
+              <div className="flex items-center justify-center h-full text-white/20 text-sm">Sin datos aún</div>
+            )}
+          </div>
+        </motion.div>
 
-          {/* Pie: Expenses by category */}
-          <motion.div variants={item} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-            <h3 className="text-sm font-semibold text-white mb-4">Gastos por categoría</h3>
-            <div className="h-[200px]">
-              {expensesByCategory.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={expensesByCategory} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={4} dataKey="value">
-                      {expensesByCategory.map((e) => <Cell key={e.name} fill={e.color} stroke="transparent" />)}
-                    </Pie>
-                    <Tooltip content={<CustomTooltip />} />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-white/30 text-sm">No hay gastos registrados</div>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-3 mt-2 justify-center">
-              {expensesByCategory.map((d) => (
-                <div key={d.name} className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full" style={{ background: d.color }} />
-                  <span className="text-[11px] text-white/40">{d.name} (${d.value.toLocaleString()})</span>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Evolution + Goals */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-5">
-          {/* Line: Monthly evolution */}
-          <motion.div variants={item} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-            <h3 className="text-sm font-semibold text-white mb-4">Evolución mensual</h3>
-            <div className="h-[220px]">
+        {/* Pie Chart — Expenses by Category */}
+        <motion.div variants={item} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+          <h3 className="text-sm font-semibold text-white mb-4">Gastos por categoría</h3>
+          <div className="h-[200px]">
+            {expensesByCategory.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={monthlyFinances}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                  <XAxis dataKey="month" tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 12 }} axisLine={{ stroke: "rgba(255,255,255,0.06)" }} tickLine={false} />
-                  <YAxis tick={{ fill: "rgba(255,255,255,0.3)", fontSize: 12 }} axisLine={false} tickLine={false} />
+                <PieChart>
+                  <Pie data={expensesByCategory} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={4} dataKey="value">
+                    {expensesByCategory.map((entry) => <Cell key={entry.name} fill={entry.color} stroke="transparent" />)}
+                  </Pie>
                   <Tooltip content={<CustomTooltip />} />
-                  <Line type="monotone" dataKey="ingresos" name="Ingresos" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4, fill: "#10b981" }} />
-                  <Line type="monotone" dataKey="gastos" name="Gastos" stroke="#ef4444" strokeWidth={2.5} dot={{ r: 4, fill: "#ef4444" }} />
-                </LineChart>
+                </PieChart>
               </ResponsiveContainer>
-            </div>
-          </motion.div>
+            ) : (
+              <div className="flex items-center justify-center h-full text-white/20 text-sm">Sin gastos registrados</div>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-3 mt-2 justify-center">
+            {expensesByCategory.map((d) => (
+              <div key={d.name} className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full" style={{ background: d.color }} />
+                <span className="text-[11px] text-white/40">{d.name}</span>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      </div>
 
-          {/* Financial Goals */}
-          <motion.div variants={item} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
-            <div className="flex items-center gap-2 mb-5">
-              <div className="p-2 rounded-xl bg-[#f99e02]/10"><Target size={16} className="text-[#f99e02]" /></div>
-              <h3 className="text-sm font-semibold text-white">Metas financieras</h3>
-            </div>
-            <div className="space-y-5">
-              {mockFinancialGoals.map((goal) => {
-                const pct = Math.round((goal.current / goal.target) * 100);
+      {/* Goals + Transactions */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-5">
+        {/* Transactions List */}
+        <motion.div variants={item} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-white">Últimas transacciones</h3>
+            <button onClick={() => setShowModal(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#f99e02]/15 text-[#f99e02] text-xs font-semibold border-none cursor-pointer hover:bg-[#f99e02]/25 transition-colors">
+              <Plus size={14} /> Agregar
+            </button>
+          </div>
+          <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
+            {transactions.length === 0 ? (
+              <div className="flex items-center justify-center py-12 text-white/20 text-sm">Sin transacciones aún. ¡Agrega la primera!</div>
+            ) : transactions.map((tx) => (
+              <div key={tx.id} className="flex items-center justify-between py-3 px-3 rounded-xl hover:bg-white/[0.02] transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${tx.type === "income" ? "bg-emerald-500/10" : "bg-red-500/10"}`}>
+                    {tx.type === "income" ? <TrendingUp size={14} className="text-emerald-400" /> : <TrendingDown size={14} className="text-red-400" />}
+                  </div>
+                  <div>
+                    <p className="text-sm text-white/80">{tx.description}</p>
+                    <p className="text-[11px] text-white/30">{tx.category_name} · {new Date(tx.date + 'T12:00:00').toLocaleDateString("es-MX", { day: "numeric", month: "short" })}</p>
+                  </div>
+                </div>
+                <span className={`text-sm font-semibold ${tx.type === "income" ? "text-emerald-400" : "text-red-400"}`}>
+                  {tx.type === "income" ? "+" : "-"}${parseFloat(tx.amount).toLocaleString()}
+                </span>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Financial Goals */}
+        <motion.div variants={item} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Target size={16} className="text-[#f99e02]" />
+            <h3 className="text-sm font-semibold text-white">Metas financieras</h3>
+          </div>
+          {goals.length === 0 ? (
+            <div className="flex items-center justify-center py-12 text-white/20 text-xs">Sin metas configuradas</div>
+          ) : (
+            <div className="space-y-4">
+              {goals.map((g) => {
+                const pct = Math.min(100, Math.round((parseFloat(g.current_amount) / parseFloat(g.target_amount)) * 100));
                 return (
-                  <div key={goal.id}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-white/70 font-medium">{goal.name}</span>
-                      <span className="text-xs font-bold" style={{ color: goal.color }}>{pct}%</span>
+                  <div key={g.id}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-sm text-white/70">{g.name}</span>
+                      <span className="text-xs text-white/40">{pct}%</span>
                     </div>
-                    <div className="w-full h-2.5 rounded-full bg-white/5 overflow-hidden">
-                      <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 1, delay: 0.3 }} className="h-full rounded-full" style={{ background: goal.color }} />
+                    <div className="w-full h-2 rounded-full bg-white/5 overflow-hidden">
+                      <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: g.color }} />
                     </div>
-                    <p className="text-xs text-white/30 mt-1.5">${goal.current.toLocaleString()} / ${goal.target.toLocaleString()}</p>
+                    <p className="text-[11px] text-white/30 mt-1">${parseFloat(g.current_amount).toLocaleString()} / ${parseFloat(g.target_amount).toLocaleString()}</p>
                   </div>
                 );
               })}
             </div>
-          </motion.div>
-        </div>
-
-        {/* Transactions Table */}
-        <motion.div variants={item} className="bg-white/[0.02] border border-white/[0.04] rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-white/[0.06]">
-            <h3 className="text-sm font-semibold text-white">Transacciones recientes</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-white/[0.04]">
-                  {["Descripción", "Categoría", "Tipo", "Monto", "Fecha"].map((h) => (
-                    <th key={h} className="text-left px-5 py-3 text-xs text-white/30 font-medium">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {transactions.map((tr) => (
-                  <tr key={tr.id} className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors">
-                    <td className="px-5 py-3 text-sm text-white/70">{tr.description}</td>
-                    <td className="px-5 py-3"><span className="text-xs text-white/40 bg-white/5 px-2.5 py-1 rounded-lg">{tr.category}</span></td>
-                    <td className="px-5 py-3">
-                      <span className={`text-xs font-medium px-2 py-1 rounded-lg ${tr.type === "income" ? "text-emerald-400 bg-emerald-400/10" : "text-red-400 bg-red-400/10"}`}>
-                        {tr.type === "income" ? "Ingreso" : "Gasto"}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3 text-sm font-semibold" style={{ color: tr.type === "income" ? "#10b981" : "#ef4444" }}>
-                      {tr.type === "income" ? "+" : "-"}${tr.amount.toLocaleString()}
-                    </td>
-                    <td className="px-5 py-3 text-xs text-white/30">{tr.date}</td>
-                  </tr>
-                ))}
-                {transactions.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-5 py-8 text-center text-sm text-white/40">No hay transacciones registradas</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          )}
         </motion.div>
-      </motion.div>
+      </div>
 
-      {/* Transaction Modal */}
+      {/* Add Transaction Modal */}
       <AnimatePresence>
-        {isModalOpen && (
-          <>
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
-              onClick={() => setIsModalOpen(false)}
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }} 
-              animate={{ opacity: 1, scale: 1, y: 0 }} 
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-[#131314] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden"
-            >
-              <div className="flex items-center justify-between p-5 border-b border-white/10">
-                <h3 className="text-lg font-bold text-white">Nueva Transacción</h3>
-                <button onClick={() => setIsModalOpen(false)} className="text-white/50 hover:text-white transition-colors">
-                  <X size={20} />
-                </button>
+        {showModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowModal(false)}>
+            <motion.form initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} onClick={(e) => e.stopPropagation()} onSubmit={handleCreateTransaction} className="w-full max-w-md bg-[#141414] border border-white/10 rounded-2xl p-6 shadow-2xl">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-bold text-white">Nueva Transacción</h2>
+                <button type="button" onClick={() => setShowModal(false)} className="text-white/30 hover:text-white/60 bg-transparent border-none cursor-pointer"><X size={20} /></button>
               </div>
-              <form onSubmit={handleSubmit} className="p-5 space-y-4">
-                
-                {/* Tipo de Transacción */}
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, type: "income" })}
-                    className={`py-3 rounded-xl text-sm font-medium transition-all ${
-                      formData.type === "income" 
-                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" 
-                        : "bg-white/5 text-white/50 border border-transparent hover:bg-white/10"
-                    }`}
-                  >
-                    Ingreso
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, type: "expense" })}
-                    className={`py-3 rounded-xl text-sm font-medium transition-all ${
-                      formData.type === "expense" 
-                        ? "bg-red-500/20 text-red-400 border border-red-500/30" 
-                        : "bg-white/5 text-white/50 border border-transparent hover:bg-white/10"
-                    }`}
-                  >
-                    Gasto
-                  </button>
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  {["expense", "income"].map((t) => (
+                    <button key={t} type="button" onClick={() => setNewTx({ ...newTx, type: t })} className={`flex-1 py-2.5 rounded-xl text-sm font-medium border-none cursor-pointer transition-all ${newTx.type === t ? (t === "income" ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-400") : "bg-white/5 text-white/40"}`}>
+                      {t === "income" ? "Ingreso" : "Gasto"}
+                    </button>
+                  ))}
                 </div>
-
-                {/* Monto y Fecha */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-white/60 font-medium">Monto</label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40">$</span>
-                      <input 
-                        type="number" required min="0" step="0.01"
-                        value={formData.amount}
-                        onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl pl-8 pr-3 py-2.5 text-white text-sm outline-none focus:border-[#f99e02] focus:ring-1 focus:ring-[#f99e02]/50 transition-all"
-                        placeholder="0.00"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs text-white/60 font-medium">Fecha</label>
-                    <input 
-                      type="date" required
-                      value={formData.date}
-                      onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-[#f99e02] focus:ring-1 focus:ring-[#f99e02]/50 transition-all"
-                      style={{ colorScheme: "dark" }}
-                    />
-                  </div>
+                <div>
+                  <label className="text-xs text-white/50 font-medium block mb-1.5">Monto</label>
+                  <input type="number" required min="0.01" step="0.01" value={newTx.amount} onChange={(e) => setNewTx({ ...newTx, amount: e.target.value })} placeholder="0.00" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 outline-none focus:border-[#f99e02]/50 transition-colors" />
                 </div>
-
-                {/* Categoría */}
-                <div className="space-y-1.5">
-                  <label className="text-xs text-white/60 font-medium">Categoría</label>
-                  <input 
-                    type="text" required
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-[#f99e02] focus:ring-1 focus:ring-[#f99e02]/50 transition-all"
-                    placeholder="Ej. Comida, Sueldo, Transporte..."
-                  />
+                <div>
+                  <label className="text-xs text-white/50 font-medium block mb-1.5">Categoría</label>
+                  <select required value={newTx.category} onChange={(e) => setNewTx({ ...newTx, category: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-[#f99e02]/50 transition-colors cursor-pointer">
+                    <option value="" className="bg-[#141414]">Seleccionar...</option>
+                    {categories.map((c) => <option key={c.id} value={c.name} className="bg-[#141414]">{c.name}</option>)}
+                  </select>
                 </div>
-
-                {/* Descripción */}
-                <div className="space-y-1.5">
-                  <label className="text-xs text-white/60 font-medium">Descripción</label>
-                  <input 
-                    type="text" required
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-white text-sm outline-none focus:border-[#f99e02] focus:ring-1 focus:ring-[#f99e02]/50 transition-all"
-                    placeholder="Detalles de la transacción..."
-                  />
+                <div>
+                  <label className="text-xs text-white/50 font-medium block mb-1.5">Descripción</label>
+                  <input type="text" required value={newTx.description} onChange={(e) => setNewTx({ ...newTx, description: e.target.value })} placeholder="¿En qué fue?" className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder-white/30 outline-none focus:border-[#f99e02]/50 transition-colors" />
                 </div>
-
-                <button 
-                  type="submit"
-                  className="w-full bg-[#f99e02] hover:bg-[#e08e02] text-white font-medium py-3 rounded-xl mt-2 transition-colors shadow-[0_0_15px_rgba(249,158,2,0.3)]"
-                >
-                  Guardar Transacción
-                </button>
-              </form>
-            </motion.div>
-          </>
+                <div>
+                  <label className="text-xs text-white/50 font-medium block mb-1.5">Fecha</label>
+                  <input type="date" value={newTx.date} onChange={(e) => setNewTx({ ...newTx, date: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:border-[#f99e02]/50 transition-colors" />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-6">
+                <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/50 text-sm font-medium hover:bg-white/5 transition-colors bg-transparent cursor-pointer">Cancelar</button>
+                <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-xl bg-[#f99e02] hover:bg-[#e08e02] text-white text-sm font-semibold border-none cursor-pointer transition-colors disabled:opacity-50">{saving ? "Guardando..." : "Guardar"}</button>
+              </div>
+            </motion.form>
+          </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 }
-

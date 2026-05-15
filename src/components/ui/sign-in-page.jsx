@@ -1,12 +1,53 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { motion } from 'framer-motion';
 import DotField from '@/components/ui/DotField';
+import { useAuth } from '@/lib/auth';
 
 export default function SignInPage({ onBack, onRegisterClick, onLogin }) {
-    const handleSubmit = (e) => { e.preventDefault(); onLogin?.(); };
+    const { signIn, signInWithGoogle, signInWithGitHub } = useAuth();
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+
+        const formData = new FormData(e.target);
+        const email = formData.get('email');
+        const password = formData.get('pwd');
+
+        try {
+            await signIn({ email, password });
+            onLogin?.();
+        } catch (err) {
+            setError(err.message || 'Credenciales incorrectas. Intenta de nuevo.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleGoogleSignIn = async () => {
+        try {
+            setError('');
+            await signInWithGoogle();
+        } catch (err) {
+            setError(err.message || 'Error con Google. Intenta de nuevo.');
+        }
+    };
+
+    const handleGitHubSignIn = async () => {
+        try {
+            setError('');
+            await signInWithGitHub();
+        } catch (err) {
+            setError(err.message || 'Error con GitHub. Intenta de nuevo.');
+        }
+    };
+
     return (
         <section className="flex min-h-screen items-center justify-center bg-background px-4 py-16 relative overflow-hidden">
             {/* DotField Background */}
@@ -43,6 +84,12 @@ export default function SignInPage({ onBack, onRegisterClick, onLogin }) {
                         <p className="text-white/60 text-sm">Bienvenido de vuelta a M.A.R.I.A.</p>
                     </div>
 
+                    {error && (
+                        <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs text-center">
+                            {error}
+                        </div>
+                    )}
+
                     <div className="mt-6 space-y-5">
                         <div className="space-y-2">
                             <Label htmlFor="email-signin">Correo Electrónico</Label>
@@ -59,8 +106,12 @@ export default function SignInPage({ onBack, onRegisterClick, onLogin }) {
                             <Input type="password" required name="pwd" id="pwd-signin" placeholder="••••••••" />
                         </div>
 
-                        <Button type="submit" className="w-full bg-[#f99e02] hover:bg-[#e08e02] text-white font-semibold rounded-xl py-6 mt-2">
-                            Ingresar
+                        <Button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full bg-[#f99e02] hover:bg-[#e08e02] text-white font-semibold rounded-xl py-6 mt-2 disabled:opacity-50"
+                        >
+                            {loading ? 'Ingresando...' : 'Ingresar'}
                         </Button>
                     </div>
 
@@ -74,6 +125,7 @@ export default function SignInPage({ onBack, onRegisterClick, onLogin }) {
                         <Button
                             type="button"
                             variant="outline"
+                            onClick={handleGoogleSignIn}
                             className="flex items-center justify-center gap-2 border-white/20 bg-white/5 hover:bg-white/10 text-white rounded-xl py-6"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 256 262">
@@ -87,6 +139,7 @@ export default function SignInPage({ onBack, onRegisterClick, onLogin }) {
                         <Button
                             type="button"
                             variant="outline"
+                            onClick={handleGitHubSignIn}
                             className="flex items-center justify-center gap-2 border-white/20 bg-white/5 hover:bg-white/10 text-white rounded-xl py-6"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24">

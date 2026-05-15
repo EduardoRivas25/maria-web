@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragOverlay,
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragOverlay, useDroppable,
 } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Plus, X, GripVertical, Clock, Search } from "lucide-react";
-import { mockTasks } from "@/data/mockData";
+import { Plus, X, GripVertical, Clock, Search, Loader2, Trash2 } from "lucide-react";
+import { tasksApi } from "@/lib/api/tasks";
 
 const columns = [
   { id: "todo", title: "📝 Pendiente", color: "#f99e02" },
@@ -19,13 +19,26 @@ const priorityConfig = {
   low: { label: "Baja", bg: "bg-emerald-500/10 text-emerald-400" },
 };
 
-function TaskCard({ task, isDragging }) {
+function TaskCard({ task, isDragging, onDelete }) {
   const p = priorityConfig[task.priority];
   return (
-    <div className={`p-4 rounded-xl border transition-all duration-200 cursor-grab active:cursor-grabbing ${isDragging ? "bg-[#1a1a1b] border-[#f99e02]/30 shadow-[0_0_30px_rgba(249,158,2,0.15)] scale-105" : "bg-white/[0.03] border-white/[0.06] hover:border-white/10 hover:bg-white/[0.05]"}`}>
+    <div className={`p-4 rounded-xl border transition-all duration-200 ${isDragging ? "bg-[#1a1a1b] border-[#f99e02]/30 shadow-[0_0_30px_rgba(249,158,2,0.15)] scale-105" : "bg-white/[0.03] border-white/[0.06] hover:border-white/10 hover:bg-white/[0.05]"}`}>
       <div className="flex items-start justify-between gap-2 mb-2">
-        <h4 className="text-sm font-medium text-white/90 leading-snug">{task.title}</h4>
-        <GripVertical size={14} className="text-white/20 flex-shrink-0 mt-0.5" />
+        <h4 className="text-sm font-medium text-white/90 leading-snug cursor-grab active:cursor-grabbing flex-1">{task.title}</h4>
+        <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
+          {onDelete && (
+            <button 
+              onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
+              className="text-white/20 hover:text-red-400 bg-transparent border-none cursor-pointer transition-colors p-1 rounded hover:bg-red-400/10"
+              title="Eliminar tarea"
+            >
+              <Trash2 size={13} />
+            </button>
+          )}
+          <div className="cursor-grab active:cursor-grabbing p-1 text-white/20 hover:text-white/50">
+            <GripVertical size={14} />
+          </div>
+        </div>
       </div>
       {task.description && <p className="text-xs text-white/35 mb-3 line-clamp-2">{task.description}</p>}
       <div className="flex items-center justify-between">
@@ -35,10 +48,10 @@ function TaskCard({ task, isDragging }) {
             <span key={tag} className="text-[10px] text-white/30 bg-white/5 px-2 py-0.5 rounded-md">{tag}</span>
           ))}
         </div>
-        {task.dueDate && (
+        {task.due_date && (
           <div className="flex items-center gap-1 text-white/25">
             <Clock size={11} />
-            <span className="text-[10px]">{new Date(task.dueDate).toLocaleDateString("es-MX", { day: "numeric", month: "short" })}</span>
+            <span className="text-[10px]">{new Date(task.due_date + 'T12:00:00').toLocaleDateString("es-MX", { day: "numeric", month: "short" })}</span>
           </div>
         )}
       </div>
@@ -46,17 +59,40 @@ function TaskCard({ task, isDragging }) {
   );
 }
 
-function SortableTaskCard({ task }) {
+function SortableTaskCard({ task, onDelete }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id, data: { task } });
   return (
     <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }} {...attributes} {...listeners}>
-      <TaskCard task={task} isDragging={false} />
+      <TaskCard task={task} isDragging={false} onDelete={onDelete} />
     </div>
   );
 }
 
+function DroppableColumn({ col, tasks, onDeleteTask }) {
+  const { setNodeRef } = useDroppable({ id: col.id });
+  return (
+    <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy} id={col.id}>
+      <div ref={setNodeRef} className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-4 min-h-[400px]">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-white/80">{col.title}</h3>
+            <span className="text-[11px] font-bold text-white/30 bg-white/5 px-2 py-0.5 rounded-full">{tasks.length}</span>
+          </div>
+          <div className="w-2 h-2 rounded-full" style={{ background: col.color }} />
+        </div>
+        <div className="space-y-3">
+          {tasks.map((task) => <SortableTaskCard key={task.id} task={task} onDelete={onDeleteTask} />)}
+          {tasks.length === 0 && <div className="flex items-center justify-center py-12 text-white/15 text-xs">Sin tareas</div>}
+        </div>
+      </div>
+    </SortableContext>
+  );
+}
+
 export default function TasksPage() {
-  const [tasks, setTasks] = useState(mockTasks);
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [activeTask, setActiveTask] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [filter, setFilter] = useState("all");
@@ -65,28 +101,94 @@ export default function TasksPage() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  const filteredTasks = tasks.filter((t) => {
-    if (filter === "today") return t.dueDate === new Date().toISOString().split("T")[0];
-    if (filter === "urgent") return t.priority === "high";
-    if (filter === "done") return t.status === "done";
-    return true;
-  }).filter((t) => !searchQuery || t.title.toLowerCase().includes(searchQuery.toLowerCase()));
+  // Fetch tasks from Insforge
+  const fetchTasks = useCallback(async () => {
+    try {
+      const data = await tasksApi.getAll({ preset: filter !== 'all' ? filter : undefined });
+      setTasks(data);
+    } catch (err) {
+      console.error('[Tasks] Fetch error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [filter]);
+
+  useEffect(() => {
+    fetchTasks();
+  }, [fetchTasks]);
+
+  // Client-side search filter (instant, no API call)
+  const filteredTasks = tasks.filter((t) =>
+    !searchQuery || t.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   function handleDragStart(e) { setActiveTask(tasks.find((t) => t.id === e.active.id)); }
-  function handleDragEnd(e) {
+
+  async function handleDragEnd(e) {
     setActiveTask(null);
     const { active, over } = e;
     if (!over) return;
+    
     const overCol = columns.find((c) => c.id === over.id);
     const overTask = tasks.find((t) => t.id === over.id);
     const targetStatus = overCol ? overCol.id : overTask?.status;
-    if (targetStatus) setTasks((prev) => prev.map((t) => t.id === active.id ? { ...t, status: targetStatus } : t));
+    const activeTaskItem = tasks.find((t) => t.id === active.id);
+
+    if (targetStatus && activeTaskItem && targetStatus !== activeTaskItem.status) {
+      // Optimistic update
+      setTasks((prev) => prev.map((t) => t.id === active.id ? { ...t, status: targetStatus } : t));
+      // Persist to DB
+      try {
+        await tasksApi.updateStatus(active.id, targetStatus);
+      } catch (err) {
+        console.error('[Tasks] Status update error:', err);
+        fetchTasks(); // Revert on error
+      }
+    }
   }
-  function handleCreateTask(ev) {
+
+  async function handleCreateTask(ev) {
     ev.preventDefault();
-    setTasks([{ id: `t${Date.now()}`, title: newTask.title, description: newTask.description, priority: newTask.priority, dueDate: newTask.dueDate, status: "todo", tags: newTask.tags ? newTask.tags.split(",").map((s) => s.trim()) : [] }, ...tasks]);
-    setNewTask({ title: "", description: "", priority: "medium", dueDate: "", tags: "" });
-    setShowModal(false);
+    setSaving(true);
+    try {
+      const created = await tasksApi.create({
+        title: newTask.title,
+        description: newTask.description,
+        priority: newTask.priority,
+        dueDate: newTask.dueDate || null,
+        tags: newTask.tags ? newTask.tags.split(",").map((s) => s.trim()).filter(Boolean) : [],
+      });
+      setTasks((prev) => [created, ...prev]);
+      setNewTask({ title: "", description: "", priority: "medium", dueDate: "", tags: "" });
+      setShowModal(false);
+    } catch (err) {
+      console.error('[Tasks] Create error:', err);
+      alert('Error al crear tarea: ' + (err.message || JSON.stringify(err)));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteTask(taskId) {
+    if (!confirm('¿Estás seguro de que quieres eliminar esta tarea?')) return;
+    try {
+      await tasksApi.delete(taskId);
+      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    } catch (err) {
+      console.error('[Tasks] Delete error:', err);
+      alert('Error al eliminar tarea: ' + (err.message || JSON.stringify(err)));
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="max-w-[1400px] flex items-center justify-center py-20">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 size={24} className="text-[#f99e02] animate-spin" />
+          <p className="text-white/40 text-sm">Cargando tareas...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -112,23 +214,7 @@ export default function TasksPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {columns.map((col) => {
             const colTasks = filteredTasks.filter((t) => t.status === col.id);
-            return (
-              <SortableContext key={col.id} items={colTasks.map((t) => t.id)} strategy={verticalListSortingStrategy} id={col.id}>
-                <div className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-4 min-h-[400px]">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-white/80">{col.title}</h3>
-                      <span className="text-[11px] font-bold text-white/30 bg-white/5 px-2 py-0.5 rounded-full">{colTasks.length}</span>
-                    </div>
-                    <div className="w-2 h-2 rounded-full" style={{ background: col.color }} />
-                  </div>
-                  <div className="space-y-3">
-                    {colTasks.map((task) => <SortableTaskCard key={task.id} task={task} />)}
-                    {colTasks.length === 0 && <div className="flex items-center justify-center py-12 text-white/15 text-xs">Sin tareas</div>}
-                  </div>
-                </div>
-              </SortableContext>
-            );
+            return <DroppableColumn key={col.id} col={col} tasks={colTasks} onDeleteTask={handleDeleteTask} />;
           })}
         </div>
         <DragOverlay>{activeTask ? <TaskCard task={activeTask} isDragging /> : null}</DragOverlay>
@@ -172,7 +258,9 @@ export default function TasksPage() {
               </div>
               <div className="flex gap-3 mt-6">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/50 text-sm font-medium hover:bg-white/5 transition-colors bg-transparent cursor-pointer">Cancelar</button>
-                <button type="submit" className="flex-1 py-2.5 rounded-xl bg-[#f99e02] hover:bg-[#e08e02] text-white text-sm font-semibold border-none cursor-pointer transition-colors">Crear Tarea</button>
+                <button type="submit" disabled={saving} className="flex-1 py-2.5 rounded-xl bg-[#f99e02] hover:bg-[#e08e02] text-white text-sm font-semibold border-none cursor-pointer transition-colors disabled:opacity-50">
+                  {saving ? 'Creando...' : 'Crear Tarea'}
+                </button>
               </div>
             </motion.form>
           </motion.div>

@@ -1,12 +1,60 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { motion } from 'framer-motion';
 import DotField from '@/components/ui/DotField';
+import { useAuth } from '@/lib/auth';
 
 export default function LoginPage({ onBack, onSignInClick, onLogin }) {
-    const handleSubmit = (e) => { e.preventDefault(); onLogin?.(); };
+    const { signUp, signInWithGoogle, signInWithGitHub } = useAuth();
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+
+        const formData = new FormData(e.target);
+        const firstName = formData.get('firstname');
+        const lastName = formData.get('lastname');
+        const email = formData.get('email');
+        const password = formData.get('pwd');
+
+        try {
+            await signUp({
+                email,
+                password,
+                fullName: `${firstName} ${lastName}`.trim(),
+            });
+            onLogin?.();
+        } catch (err) {
+            setError(err.message || 'Error al registrarse. Intenta de nuevo.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleGoogleSignUp = async () => {
+        try {
+            setError('');
+            await signInWithGoogle();
+            // Redirect handled by OAuth flow
+        } catch (err) {
+            setError(err.message || 'Error con Google. Intenta de nuevo.');
+        }
+    };
+
+    const handleGitHubSignUp = async () => {
+        try {
+            setError('');
+            await signInWithGitHub();
+        } catch (err) {
+            setError(err.message || 'Error con GitHub. Intenta de nuevo.');
+        }
+    };
+
     return (
         <section className="flex min-h-screen items-center justify-center bg-background px-4 py-16 relative overflow-hidden">
             {/* DotField Background */}
@@ -43,6 +91,12 @@ export default function LoginPage({ onBack, onSignInClick, onLogin }) {
                         <p className="text-white/60 text-sm">Bienvenido a M.A.R.I.A. Regístrate para comenzar</p>
                     </div>
 
+                    {error && (
+                        <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs text-center">
+                            {error}
+                        </div>
+                    )}
+
                     <div className="mt-6 space-y-5">
                         <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-2">
@@ -63,15 +117,16 @@ export default function LoginPage({ onBack, onSignInClick, onLogin }) {
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
                                 <Label htmlFor="pwd">Contraseña</Label>
-                                <a href="#" className="text-xs text-[#f99e02] hover:text-[#e08e02] transition-colors">
-                                    ¿Olvidaste tu contraseña?
-                                </a>
                             </div>
-                            <Input type="password" required name="pwd" id="pwd" placeholder="••••••••" />
+                            <Input type="password" required name="pwd" id="pwd" placeholder="••••••••" minLength={6} />
                         </div>
 
-                        <Button type="submit" className="w-full bg-[#f99e02] hover:bg-[#e08e02] text-white font-semibold rounded-xl py-6 mt-2">
-                            Registrarse
+                        <Button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full bg-[#f99e02] hover:bg-[#e08e02] text-white font-semibold rounded-xl py-6 mt-2 disabled:opacity-50"
+                        >
+                            {loading ? 'Registrando...' : 'Registrarse'}
                         </Button>
                     </div>
 
@@ -85,6 +140,7 @@ export default function LoginPage({ onBack, onSignInClick, onLogin }) {
                         <Button
                             type="button"
                             variant="outline"
+                            onClick={handleGoogleSignUp}
                             className="flex items-center justify-center gap-2 border-white/20 bg-white/5 hover:bg-white/10 text-white rounded-xl py-6"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 256 262">
@@ -98,6 +154,7 @@ export default function LoginPage({ onBack, onSignInClick, onLogin }) {
                         <Button
                             type="button"
                             variant="outline"
+                            onClick={handleGitHubSignUp}
                             className="flex items-center justify-center gap-2 border-white/20 bg-white/5 hover:bg-white/10 text-white rounded-xl py-6"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" width="1.2em" height="1.2em" viewBox="0 0 24 24">
