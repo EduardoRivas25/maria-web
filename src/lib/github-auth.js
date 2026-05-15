@@ -62,25 +62,57 @@ export async function handleGitHubCallback(code) {
 }
 
 export async function fetchGitHubContributions(username) {
+  const token = localStorage.getItem(GITHUB_TOKEN_KEY);
+  if (!token) return [];
+  
+  const query = `
+    query($username: String!) {
+      user(login: $username) {
+        contributionsCollection {
+          contributionCalendar {
+            weeks {
+              contributionDays {
+                contributionCount
+                date
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+  
   try {
-    // We use a public GraphQL proxy for the contributions heatmap if possible
-    // Alternatively, just scrape the public SVG or use a public REST API.
-    // The easiest public REST API for GitHub contributions:
-    const res = await fetch(`https://github-contributions-api.jasonbarry.co/v1/year/${username}`);
-    if (!res.ok) throw new Error("API failed");
-    const data = await res.json();
-    // data.contributions is array of { date: 'YYYY-MM-DD', count: N }
+    const res = await fetch("https://api.github.com/graphql", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ query, variables: { username } })
+    });
     
-    // Map to our heatmap format
-    // We need an array of objects: { date, count }
+    if (!res.ok) throw new Error("GraphQL fetch failed");
+    
+    const { data, errors } = await res.json();
+    if (errors) {
+      console.error("GraphQL errors:", errors);
+      return [];
+    }
+    
+    const weeks = data?.user?.contributionsCollection?.contributionCalendar?.weeks || [];
+    let days = [];
+    weeks.forEach(week => {
+      week.contributionDays.forEach(day => {
+        days.push({ date: day.date.split('T')[0], count: day.contributionCount });
+      });
+    });
+    
     // Sort by date ascending
-    const sorted = (data.contributions || []).sort((a,b) => new Date(a.date) - new Date(b.date));
-    
-    // Get last 140 days
-    const last140 = sorted.slice(-140);
-    return last140;
+    days = days.sort((a,b) => new Date(a.date) - new Date(b.date));
+    return days.slice(-140);
   } catch (err) {
-    console.error("Failed to fetch GitHub contributions:", err);
+    console.error("Failed to fetch GitHub contributions via GraphQL:", err);
     return [];
   }
 }

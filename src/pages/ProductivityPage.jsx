@@ -180,7 +180,7 @@ export default function ProductivityPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_350px] gap-5">
         {/* Heatmap */}
-        <motion.div variants={item} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+        <motion.div variants={item} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 min-w-0 overflow-hidden">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <h3 className="text-sm font-semibold text-white">Contribuciones</h3>
