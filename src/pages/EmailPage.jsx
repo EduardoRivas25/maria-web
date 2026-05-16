@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { Mail, Star, Archive, Search, Loader2, AlertCircle } from "lucide-react";
+import { Mail, Star, Archive, Search, Loader2, AlertCircle, ChevronLeft } from "lucide-react";
 import { gmailApi } from "@/lib/api/gmail";
 import { isGoogleConnected } from "@/lib/google-auth";
 import GoogleConnectPrompt from "@/components/GoogleConnectPrompt";
@@ -139,7 +139,7 @@ export default function EmailPage() {
       ) : (
         <div className="flex flex-col lg:grid lg:grid-cols-[1fr_1fr] gap-5 flex-1 min-h-0 overflow-y-auto lg:overflow-hidden hide-scrollbar">
           {/* Email List */}
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-white/[0.02] border border-white/[0.04] rounded-2xl overflow-hidden flex flex-col h-[400px] lg:h-auto shrink-0 lg:shrink">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={`bg-white/[0.02] border border-white/[0.04] rounded-2xl overflow-hidden flex-col shrink-0 lg:shrink ${selectedId ? 'hidden lg:flex lg:flex-1' : 'flex flex-1'}`}>
             <div className="overflow-y-auto flex-1 hide-scrollbar">
               {emails.length === 0 ? (
                 <div className="flex items-center justify-center h-full text-white/20 text-sm">No se encontraron correos</div>
@@ -174,12 +174,17 @@ export default function EmailPage() {
           </motion.div>
 
           {/* Email Preview */}
-          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className="bg-white/[0.02] border border-white/[0.04] rounded-2xl overflow-hidden flex flex-col min-h-[500px] lg:min-h-0 flex-1">
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }} className={`bg-white/[0.02] border border-white/[0.04] rounded-2xl overflow-hidden flex-col flex-1 ${!selectedId ? 'hidden lg:flex' : 'flex'}`}>
             {selectedListEmail ? (
               <div className="flex flex-col h-full">
                 <div className="px-6 py-5 border-b border-white/[0.04]">
-                  <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-base font-bold text-white leading-tight">{selectedListEmail.subject}</h2>
+                  <div className="flex items-start justify-between mb-3 gap-3">
+                    <div className="flex items-start gap-2 flex-1">
+                      <button onClick={() => setSelectedId(null)} className="lg:hidden p-1.5 -ml-2 -mt-1 rounded-lg hover:bg-white/5 transition-colors text-white/50 hover:text-white bg-transparent border-none cursor-pointer flex-shrink-0">
+                        <ChevronLeft size={20} />
+                      </button>
+                      <h2 className="text-base font-bold text-white leading-tight mt-0.5">{selectedListEmail.subject}</h2>
+                    </div>
                     <div className="flex items-center gap-1 flex-shrink-0 ml-4">
                       <button onClick={(e) => toggleStar(selectedListEmail.id, e)} className="p-2 rounded-lg hover:bg-white/5 transition-colors bg-transparent border-none cursor-pointer">
                         {selectedListEmail.isStarred ? <Star size={16} className="text-[#f99e02] fill-[#f99e02]" /> : <Star size={16} className="text-white/30" />}

@@ -176,12 +176,13 @@ export default function FilesPage() {
             const color = typeColors[file.mimeType] || "#6366f1";
             const isDeleting = deletingId === file.id;
             return (
-              <motion.div key={file.id} variants={item} onClick={(e) => handleItemClick(e, file)} className={`bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:border-white/10 hover:shadow-[0_0_30px_rgba(249,158,2,0.04)] transition-all duration-300 cursor-pointer group relative overflow-hidden ${isDeleting ? 'opacity-50 pointer-events-none' : ''}`}>
-                <div className="flex items-center justify-center w-14 h-14 rounded-xl mx-auto mb-4" style={{ background: `${color}12` }}>
-                  <Icon size={28} style={{ color }} />
+              <motion.div key={file.id} variants={item} onClick={(e) => handleItemClick(e, file)} className={`bg-white/[0.03] border border-white/[0.06] rounded-2xl p-3 sm:p-5 hover:border-white/10 hover:shadow-[0_0_30px_rgba(249,158,2,0.04)] transition-all duration-300 cursor-pointer group relative overflow-hidden ${isDeleting ? 'opacity-50 pointer-events-none' : ''}`}>
+                <div className="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-xl mx-auto mb-3 sm:mb-4" style={{ background: `${color}12` }}>
+                  <Icon size={24} className="sm:hidden" style={{ color }} />
+                  <Icon size={28} className="hidden sm:block" style={{ color }} />
                 </div>
-                <h4 className="text-sm font-medium text-white/80 text-center truncate group-hover:text-white transition-colors px-2" title={file.name}>{file.name}</h4>
-                <p className="text-xs text-white/30 text-center mt-1">{formatSize(file.size)} · {formatDate(file.modifiedTime)}</p>
+                <h4 className="text-xs sm:text-sm font-medium text-white/80 text-center truncate group-hover:text-white transition-colors px-1 sm:px-2" title={file.name}>{file.name}</h4>
+                <p className="text-[10px] sm:text-xs text-white/30 text-center mt-1">{formatSize(file.size)} · {formatDate(file.modifiedTime)}</p>
                 <div className="flex items-center justify-center gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
                   {file.mimeType !== 'application/vnd.google-apps.folder' && (
                     <>

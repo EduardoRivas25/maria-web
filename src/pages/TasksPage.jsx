@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragOverlay, useDroppable,
+  DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay, useDroppable,
 } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -72,7 +72,7 @@ function DroppableColumn({ col, tasks, onDeleteTask }) {
   const { setNodeRef } = useDroppable({ id: col.id });
   return (
     <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy} id={col.id}>
-      <div ref={setNodeRef} className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-4 min-h-[400px]">
+      <div ref={setNodeRef} className="bg-white/[0.02] border border-white/[0.04] rounded-2xl p-4 min-h-[400px] min-w-[85vw] md:min-w-0 snap-center shrink-0">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-white/80">{col.title}</h3>
@@ -99,7 +99,10 @@ export default function TasksPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [newTask, setNewTask] = useState({ title: "", description: "", priority: "medium", dueDate: "", tags: "" });
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } })
+  );
 
   // Fetch tasks from Insforge
   const fetchTasks = useCallback(async () => {
@@ -211,7 +214,7 @@ export default function TasksPage() {
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="flex md:grid md:grid-cols-3 gap-5 overflow-x-auto snap-x snap-mandatory hide-scrollbar pb-4 -mx-4 px-4 md:mx-0 md:px-0 md:overflow-visible">
           {columns.map((col) => {
             const colTasks = filteredTasks.filter((t) => t.status === col.id);
             return <DroppableColumn key={col.id} col={col} tasks={colTasks} onDeleteTask={handleDeleteTask} />;
