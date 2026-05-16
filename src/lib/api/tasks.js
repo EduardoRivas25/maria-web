@@ -142,6 +142,20 @@ export const tasksApi = {
       .single();
 
     if (error) throw error;
+
+    // Log activity
+    try {
+      await insforge.database.from('activity_log').insert({
+        user_id: user.id,
+        action: 'task_created',
+        entity_type: 'task',
+        entity_id: data.id,
+        metadata: { title: data.title },
+      });
+    } catch (logErr) {
+      console.warn('[Tasks] Activity log insert failed:', logErr);
+    }
+
     return data;
   },
 
@@ -161,6 +175,13 @@ export const tasksApi = {
     if (updates.categoryId !== undefined) payload.category_id = updates.categoryId;
     if (updates.sortOrder !== undefined) payload.sort_order = updates.sortOrder;
 
+    // Set completed_at when task is marked as done
+    if (updates.status === 'done') {
+      payload.completed_at = new Date().toISOString();
+    } else if (updates.status && updates.status !== 'done') {
+      payload.completed_at = null;
+    }
+
     const { data, error } = await insforge.database
       .from('tasks')
       .update(payload)
@@ -169,6 +190,23 @@ export const tasksApi = {
       .single();
 
     if (error) throw error;
+
+    // Log activity when task is completed
+    if (updates.status === 'done') {
+      try {
+        const userId = await getUserId();
+        await insforge.database.from('activity_log').insert({
+          user_id: userId,
+          action: 'task_completed',
+          entity_type: 'task',
+          entity_id: id,
+          metadata: { title: data.title },
+        });
+      } catch (logErr) {
+        console.warn('[Tasks] Activity log insert failed:', logErr);
+      }
+    }
+
     return data;
   },
 
@@ -186,6 +224,19 @@ export const tasksApi = {
    * @param {string} id
    */
   async delete(id) {
+    // Log before deleting
+    try {
+      const userId = await getUserId();
+      await insforge.database.from('activity_log').insert({
+        user_id: userId,
+        action: 'task_deleted',
+        entity_type: 'task',
+        entity_id: id,
+      });
+    } catch (logErr) {
+      console.warn('[Tasks] Activity log insert failed:', logErr);
+    }
+
     const { error } = await insforge.database
       .from('tasks')
       .delete()
