@@ -99,8 +99,9 @@ function App() {
       {/* El Problema Section */}
       <section id="features" className="relative z-10 py-16 px-8 max-w-7xl mx-auto w-full">
         <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-white">El </h2>
-          <span className="text-[#f99e02] font-bold text-4xl md:text-5xl mb-4">Problema</span>
+          <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
+            El <span className="text-[#f99e02]">Problema</span>
+          </h2>
           <p className="text-xl text-white/60 max-w-2xl mx-auto mt-4">
             La fragmentación digital está frenando tu potencial. Descubre por qué el caos actual no te deja avanzar.
           </p>
@@ -187,10 +188,14 @@ function App() {
       </section>
 
       {/* Integrations Section */}
-      <IntegrationHero />
+      <section id="integrations" className="w-full">
+        <IntegrationHero />
+      </section>
 
       {/* Pricing Section */}
-      <PricingSection />
+      <section id="pricing" className="w-full">
+        <PricingSection />
+      </section>
 
       <MariaFooter />
         </>

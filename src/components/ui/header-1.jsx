@@ -35,6 +35,23 @@ export function Header({ onSignInClick, onRegisterClick, onLogoClick }) {
 		};
 	}, [open]);
 
+	const handleScroll = (e, href) => {
+		e.preventDefault();
+		const targetId = href.replace('#', '');
+		const elem = document.getElementById(targetId);
+		if (elem) {
+			const headerOffset = 56; // h-14 is 56px
+			const elementPosition = elem.getBoundingClientRect().top;
+			const offsetPosition = elementPosition + window.scrollY - headerOffset;
+	
+			window.scrollTo({
+				top: offsetPosition,
+				behavior: "smooth"
+			});
+		}
+		setOpen(false);
+	};
+
 	return (
 		<header
 			className={cn(
@@ -48,7 +65,7 @@ export function Header({ onSignInClick, onRegisterClick, onLogoClick }) {
 				</button>
 				<div className="hidden items-center gap-2 md:flex">
 					{links.map((link) => (
-						<a key={link.label} className={buttonVariants({ variant: 'ghost' })} href={link.href}>
+						<a key={link.label} className={buttonVariants({ variant: 'ghost' })} href={link.href} onClick={(e) => handleScroll(e, link.href)}>
 							{link.label}
 						</a>
 					))}
@@ -77,6 +94,7 @@ export function Header({ onSignInClick, onRegisterClick, onLogoClick }) {
 								className: 'justify-start',
 							})}
 							href={link.href}
+							onClick={(e) => handleScroll(e, link.href)}
 						>
 							{link.label}
 						</a>
