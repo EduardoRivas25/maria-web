@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -11,14 +11,13 @@ import {
   Calendar,
   Clock,
   Menu,
-  DollarSign,
-  AlertCircle,
+  Mail,
+  BookOpen,
   CheckCircle,
-  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { notificationsApi } from "@/lib/api/notifications";
-import { useNotificationsRealtime } from "@/lib/hooks/useRealtime";
+import { useSmartNotifications } from "@/lib/hooks/useSmartNotifications";
 
 const pageTitles = {
   "/dashboard": "Inicio",
@@ -36,8 +35,16 @@ const notifIcons = {
   task: CheckSquare,
   event: Calendar,
   reminder: Clock,
-  finance: DollarSign,
-  system: AlertCircle,
+  email: Mail,
+  classroom: BookOpen,
+};
+
+const notifColors = {
+  task: { bg: "bg-[#f99e02]/20", text: "text-[#f99e02]" },
+  event: { bg: "bg-blue-500/20", text: "text-blue-400" },
+  reminder: { bg: "bg-purple-500/20", text: "text-purple-400" },
+  email: { bg: "bg-emerald-500/20", text: "text-emerald-400" },
+  classroom: { bg: "bg-indigo-500/20", text: "text-indigo-400" },
 };
 
 export default function Topbar({ isMobile, onOpenMobileMenu }) {
@@ -46,92 +53,30 @@ export default function Topbar({ isMobile, onOpenMobileMenu }) {
   const { user, profile, signOut } = useAuth();
   const [showNotifs, setShowNotifs] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-  const [notifications, setNotifications] = useState([]);
-  const [loadingNotifs, setLoadingNotifs] = useState(false);
   const notifRef = useRef(null);
   const profileRef = useRef(null);
+
+  const {
+    notifications,
+    unreadCount,
+    loading: notifsLoading,
+    markAsRead,
+    markAllAsRead,
+    refresh: refreshNotifs,
+  } = useSmartNotifications();
 
   const currentTitle = pageTitles[location.pathname] || "Dashboard";
   const displayName = profile?.full_name || user?.email?.split('@')[0] || "Usuario";
   const displayEmail = profile?.email || user?.email || "";
   const initials = displayName.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2) || "U";
 
-  // ── Load notifications ────────────────────────────────────
-  const loadNotifications = useCallback(async () => {
-    try {
-      const data = await notificationsApi.getAll({ limit: 15 });
-      setNotifications(data);
-    } catch (err) {
-      console.warn('[Topbar] Failed to load notifications:', err);
-    }
-  }, []);
-
-  // Load on mount
-  useEffect(() => {
-    loadNotifications();
-  }, [loadNotifications]);
-
-  // ── Realtime: listen for new notifications ────────────────
-  useNotificationsRealtime(user?.id, {
-    onNew: useCallback((newNotif) => {
-      setNotifications(prev => [newNotif, ...prev].slice(0, 15));
-    }, []),
-    onRead: useCallback((updatedNotif) => {
-      setNotifications(prev =>
-        prev.map(n => n.id === updatedNotif.id ? { ...n, read: true } : n)
-      );
-    }, []),
-  });
-
-  const unreadCount = notifications.filter(n => !n.read).length;
-
-  // ── Mark notification as read ─────────────────────────────
-  const handleNotifClick = async (notif) => {
-    if (!notif.read) {
-      try {
-        await notificationsApi.markRead(notif.id);
-        setNotifications(prev =>
-          prev.map(n => n.id === notif.id ? { ...n, read: true } : n)
-        );
-      } catch (err) {
-        console.warn('[Topbar] Failed to mark notification as read:', err);
-      }
-    }
-    // Navigate if action_url is present
-    if (notif.action_url) {
-      navigate(notif.action_url);
+  // ── Handle notification click ─────────────────────────────
+  const handleNotifClick = (notif) => {
+    markAsRead(notif.id);
+    if (notif.actionUrl) {
+      navigate(notif.actionUrl);
       setShowNotifs(false);
     }
-  };
-
-  // ── Mark all as read ──────────────────────────────────────
-  const handleMarkAllRead = async () => {
-    setLoadingNotifs(true);
-    try {
-      await notificationsApi.markAllRead();
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-    } catch (err) {
-      console.warn('[Topbar] Failed to mark all as read:', err);
-    } finally {
-      setLoadingNotifs(false);
-    }
-  };
-
-  // ── Format relative time ──────────────────────────────────
-  const formatTime = (dateStr) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return 'ahora';
-    if (diffMins < 60) return `hace ${diffMins} min`;
-    if (diffHours < 24) return `hace ${diffHours}h`;
-    if (diffDays < 7) return `hace ${diffDays}d`;
-    return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' });
   };
 
   // Close dropdowns on outside click
@@ -190,11 +135,15 @@ export default function Topbar({ isMobile, onOpenMobileMenu }) {
           >
             <Bell size={20} />
             {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 flex items-center justify-center
-                               w-5 h-5 text-[10px] font-bold text-white bg-[#f99e02] rounded-full
-                               shadow-[0_0_10px_rgba(249,158,2,0.4)]">
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="absolute -top-0.5 -right-0.5 flex items-center justify-center
+                           w-5 h-5 text-[10px] font-bold text-white bg-[#f99e02] rounded-full
+                           shadow-[0_0_10px_rgba(249,158,2,0.4)]"
+              >
                 {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
+              </motion.span>
             )}
           </button>
 
@@ -205,50 +154,75 @@ export default function Topbar({ isMobile, onOpenMobileMenu }) {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.96 }}
                 transition={{ duration: 0.2 }}
-                className="absolute right-0 top-12 w-80 rounded-2xl border border-white/10
+                className="absolute right-0 top-12 w-80 sm:w-96 rounded-2xl border border-white/10
                            bg-[#141414] shadow-2xl overflow-hidden"
               >
                 {/* Header */}
                 <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-white">Notificaciones</h3>
-                  {unreadCount > 0 && (
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-white">Notificaciones</h3>
+                    {unreadCount > 0 && (
+                      <span className="text-[10px] font-bold text-[#f99e02] bg-[#f99e02]/10 px-1.5 py-0.5 rounded-full">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {/* Refresh button */}
                     <button
-                      onClick={handleMarkAllRead}
-                      disabled={loadingNotifs}
-                      className="text-[10px] text-[#f99e02] hover:text-[#f99e02]/80 bg-transparent 
-                                 border-none cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                      onClick={refreshNotifs}
+                      className="p-1 text-white/30 hover:text-white/60 bg-transparent border-none 
+                                 cursor-pointer transition-colors rounded-lg hover:bg-white/5"
+                      title="Actualizar"
                     >
-                      {loadingNotifs ? (
-                        <Loader2 size={10} className="animate-spin" />
-                      ) : (
-                        <CheckCircle size={10} />
-                      )}
-                      Marcar todo leído
+                      <RefreshCw size={12} className={notifsLoading ? 'animate-spin' : ''} />
                     </button>
-                  )}
+                    {/* Mark all read */}
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={markAllAsRead}
+                        className="text-[10px] text-[#f99e02] hover:text-[#f99e02]/80 bg-transparent 
+                                   border-none cursor-pointer flex items-center gap-1"
+                      >
+                        <CheckCircle size={10} />
+                        Marcar todo leído
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Notification list */}
-                <div className="max-h-80 overflow-y-auto">
+                <div className="max-h-[400px] overflow-y-auto">
                   {notifications.length > 0 ? (
                     notifications.map((notif) => {
                       const Icon = notifIcons[notif.type] || Bell;
+                      const colors = notifColors[notif.type] || notifColors.task;
                       return (
                         <div
                           key={notif.id}
                           onClick={() => handleNotifClick(notif)}
-                          className={`flex items-start gap-3 px-4 py-3 hover:bg-white/5 transition-colors cursor-pointer border-b border-white/5 last:border-none
-                            ${!notif.read ? "bg-[#f99e02]/5" : ""}`}
+                          className={`flex items-start gap-3 px-4 py-3 hover:bg-white/5 transition-colors 
+                                     cursor-pointer border-b border-white/[0.03] last:border-none
+                                     ${!notif.read ? "bg-white/[0.02]" : ""}`}
                         >
-                          <div className={`flex-shrink-0 mt-0.5 p-1.5 rounded-lg ${!notif.read ? "bg-[#f99e02]/20 text-[#f99e02]" : "bg-white/5 text-white/40"}`}>
+                          <div className={`flex-shrink-0 mt-0.5 p-1.5 rounded-lg 
+                            ${!notif.read ? colors.bg + ' ' + colors.text : "bg-white/5 text-white/30"}`}>
                             <Icon size={14} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className={`text-xs font-medium truncate ${!notif.read ? "text-white" : "text-white/60"}`}>
-                              {notif.title}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className={`text-xs font-medium truncate ${!notif.read ? "text-white" : "text-white/50"}`}>
+                                {notif.title}
+                              </p>
+                              {notif.isNew && (
+                                <span className="text-[9px] font-bold text-emerald-400 bg-emerald-400/10 
+                                                 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                                  NUEVO
+                                </span>
+                              )}
+                            </div>
                             <p className="text-[11px] text-white/40 mt-0.5 line-clamp-2">{notif.message}</p>
-                            <p className="text-[10px] text-white/30 mt-1">{formatTime(notif.created_at)}</p>
+                            <p className="text-[10px] text-white/25 mt-1">{notif.time}</p>
                           </div>
                           {!notif.read && (
                             <div className="flex-shrink-0 w-2 h-2 rounded-full bg-[#f99e02] mt-1.5" />
@@ -256,10 +230,18 @@ export default function Topbar({ isMobile, onOpenMobileMenu }) {
                         </div>
                       );
                     })
+                  ) : notifsLoading ? (
+                    <div className="flex flex-col items-center py-8 text-center">
+                      <div className="w-6 h-6 border-2 border-[#f99e02] border-t-transparent rounded-full animate-spin mb-3" />
+                      <p className="text-xs text-white/30">Revisando...</p>
+                    </div>
                   ) : (
                     <div className="flex flex-col items-center py-8 text-center">
-                      <Bell size={20} className="text-white/15 mb-2" />
-                      <p className="text-xs text-white/30">Sin notificaciones</p>
+                      <div className="p-3 rounded-xl bg-emerald-500/10 mb-3">
+                        <CheckCircle size={20} className="text-emerald-400" />
+                      </div>
+                      <p className="text-xs text-white/50 font-medium">¡Todo en orden!</p>
+                      <p className="text-[11px] text-white/25 mt-1">No tienes pendientes por ahora</p>
                     </div>
                   )}
                 </div>

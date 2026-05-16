@@ -116,6 +116,8 @@ export async function connectGoogle() {
 /**
  * Make an authenticated fetch to a Google API endpoint.
  * Automatically attaches the access token.
+ * Uses in-memory cache for GET requests to avoid redundant calls
+ * when switching between dashboard tabs.
  * Throws if no token is available.
  */
 export async function googleFetch(url, options = {}) {
@@ -124,6 +126,51 @@ export async function googleFetch(url, options = {}) {
     throw new Error('NO_GOOGLE_TOKEN');
   }
 
+  const method = (options.method || 'GET').toUpperCase();
+  const isRead = method === 'GET';
+
+  // ── Cache: check for cached GET responses ─────────────────
+  if (isRead) {
+    const { getCachedResponse } = await import('./google-cache.js');
+    const cached = getCachedResponse(url);
+    if (cached && !cached.isStale) {
+      // Fresh cache hit — return immediately
+      return cached.data;
+    }
+    if (cached && cached.isStale) {
+      // Stale cache — return stale data immediately, refresh in background
+      _backgroundRefresh(url, token);
+      return cached.data;
+    }
+  }
+
+  // ── Actual fetch ──────────────────────────────────────────
+  const data = await _rawGoogleFetch(url, token, options);
+
+  // ── Cache: store GET responses ────────────────────────────
+  if (isRead && data !== null) {
+    const { setCachedResponse } = await import('./google-cache.js');
+    setCachedResponse(url, data);
+  }
+
+  // ── Cache: invalidate on mutations ────────────────────────
+  if (!isRead) {
+    const { invalidateCache } = await import('./google-cache.js');
+    // Detect which service and invalidate its cache
+    if (url.includes('calendar.googleapis.com')) invalidateCache('calendar');
+    else if (url.includes('gmail.googleapis.com')) invalidateCache('gmail');
+    else if (url.includes('drive.googleapis.com')) invalidateCache('drive');
+    else if (url.includes('classroom.googleapis.com')) invalidateCache('classroom');
+  }
+
+  return data;
+}
+
+/**
+ * Raw fetch without cache logic (used internally).
+ * @private
+ */
+async function _rawGoogleFetch(url, token, options = {}) {
   const res = await fetch(url, {
     ...options,
     headers: {
@@ -151,4 +198,21 @@ export async function googleFetch(url, options = {}) {
   }
 
   return res.json();
+}
+
+/**
+ * Refresh a cached URL in the background (stale-while-revalidate).
+ * @private
+ */
+function _backgroundRefresh(url, token) {
+  _rawGoogleFetch(url, token)
+    .then(async (data) => {
+      if (data !== null) {
+        const { setCachedResponse } = await import('./google-cache.js');
+        setCachedResponse(url, data);
+      }
+    })
+    .catch((err) => {
+      console.warn('[GoogleCache] Background refresh failed:', err.message);
+    });
 }

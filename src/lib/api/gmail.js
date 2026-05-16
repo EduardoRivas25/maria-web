@@ -27,33 +27,37 @@ export const gmailApi = {
 
     const listData = await googleFetch(`${BASE}/messages?${qs}`);
 
-    // Fetch metadata for each message
+    // Fetch metadata for ALL messages in parallel (not one-by-one)
     const messages = [];
     if (listData.messages) {
-      for (const msg of listData.messages) {
-        try {
-          const fullMsg = await googleFetch(
+      const results = await Promise.allSettled(
+        listData.messages.map(msg =>
+          googleFetch(
             `${BASE}/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`
-          );
+          )
+        )
+      );
 
-          const headers = fullMsg.payload?.headers || [];
-          const from = headers.find(h => h.name === 'From')?.value || '';
-          const subject = headers.find(h => h.name === 'Subject')?.value || '(Sin asunto)';
-          const date = headers.find(h => h.name === 'Date')?.value || '';
+      for (let i = 0; i < results.length; i++) {
+        const result = results[i];
+        if (result.status !== 'fulfilled') continue;
 
-          messages.push({
-            id: msg.id,
-            threadId: msg.threadId,
-            snippet: fullMsg.snippet,
-            from,
-            subject,
-            date,
-            isUnread: fullMsg.labelIds?.includes('UNREAD'),
-            isStarred: fullMsg.labelIds?.includes('STARRED'),
-          });
-        } catch (e) {
-          console.error('[Gmail] Error fetching message details:', e);
-        }
+        const fullMsg = result.value;
+        const headers = fullMsg.payload?.headers || [];
+        const from = headers.find(h => h.name === 'From')?.value || '';
+        const subject = headers.find(h => h.name === 'Subject')?.value || '(Sin asunto)';
+        const date = headers.find(h => h.name === 'Date')?.value || '';
+
+        messages.push({
+          id: listData.messages[i].id,
+          threadId: listData.messages[i].threadId,
+          snippet: fullMsg.snippet,
+          from,
+          subject,
+          date,
+          isUnread: fullMsg.labelIds?.includes('UNREAD'),
+          isStarred: fullMsg.labelIds?.includes('STARRED'),
+        });
       }
     }
 

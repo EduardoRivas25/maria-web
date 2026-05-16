@@ -12,8 +12,8 @@ import {
   AlertTriangle,
   RefreshCw,
   Loader2,
-  Bell,
   Zap,
+  ListTodo,
 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { useNavigate } from "react-router-dom";
@@ -23,7 +23,6 @@ import { calendarApi } from "@/lib/api/calendar";
 import { gmailApi } from "@/lib/api/gmail";
 import { driveApi } from "@/lib/api/drive";
 import { isGoogleConnected } from "@/lib/google-auth";
-import { useTasksRealtime, useNotificationsRealtime } from "@/lib/hooks/useRealtime";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -235,26 +234,13 @@ export default function DashboardHome() {
     loadDashboard();
   }, [loadDashboard]);
 
-  // ── Realtime subscriptions ───────────────────────────────
-  useTasksRealtime(user?.id, useCallback(() => {
-    // Reload summary when tasks change
-    loadDashboard();
-  }, [loadDashboard]));
-
-  useNotificationsRealtime(user?.id, {
-    onNew: useCallback(() => {
-      loadDashboard();
-    }, [loadDashboard]),
-  });
-
   // ── Helpers ──────────────────────────────────────────────
   const displayName = profile?.full_name || user?.email?.split('@')[0] || 'Usuario';
 
   const taskCounts = summary?.tasks || { todo: 0, inProgress: 0, done: 0, total: 0 };
   const finance = summary?.finance || { income: 0, expense: 0, balance: 0 };
   const weeklyProductivity = summary?.weeklyProductivity || [];
-  const notifications = summary?.notifications || [];
-  const unreadCount = summary?.unreadNotifications || 0;
+  const upcomingTasks = summary?.upcomingTasks || [];
 
   // Calculate trend percentages (simple heuristic)
   const incomeTrend = finance.income > 0 ? '+' + Math.round(finance.income / 100) + '%' : '0%';
@@ -506,34 +492,46 @@ export default function DashboardHome() {
           </>
         ) : (
           <>
-            <CardHeader icon={Bell} title="Notificaciones Recientes" />
-            {notifications.length > 0 ? (
+            <CardHeader icon={ListTodo} title="Tareas Pendientes" action onAction={() => navigate('/dashboard/tareas')} />
+            {upcomingTasks.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {notifications.slice(0, 6).map((notif) => (
-                  <div
-                    key={notif.id}
-                    className={`flex items-start gap-3 p-3 rounded-xl transition-colors cursor-pointer
-                      ${!notif.read ? 'bg-[#f99e02]/5 hover:bg-[#f99e02]/10' : 'bg-white/[0.02] hover:bg-white/[0.04]'}`}
-                    onClick={() => notif.action_url && navigate(notif.action_url)}
-                  >
-                    <div className={`flex-shrink-0 mt-0.5 p-1.5 rounded-lg 
-                      ${!notif.read ? 'bg-[#f99e02]/20 text-[#f99e02]' : 'bg-white/5 text-white/40'}`}>
-                      <Bell size={12} />
+                {upcomingTasks.slice(0, 6).map((task) => {
+                  const priorityColors = {
+                    high: { bg: 'bg-red-500/10', text: 'text-red-400', label: 'Alta' },
+                    medium: { bg: 'bg-[#f99e02]/10', text: 'text-[#f99e02]', label: 'Media' },
+                    low: { bg: 'bg-blue-500/10', text: 'text-blue-400', label: 'Baja' },
+                  };
+                  const prio = priorityColors[task.priority] || priorityColors.medium;
+                  return (
+                    <div
+                      key={task.id}
+                      className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] transition-colors cursor-pointer"
+                      onClick={() => navigate('/dashboard/tareas')}
+                    >
+                      <div className={`flex-shrink-0 mt-0.5 p-1.5 rounded-lg ${prio.bg} ${prio.text}`}>
+                        <CheckSquare size={12} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-white/80 truncate">{task.title}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          {task.due_date && (
+                            <span className="text-[10px] text-white/30">
+                              {task.due_date === new Date().toISOString().split('T')[0] ? 'Hoy' : task.due_date}
+                            </span>
+                          )}
+                          <span className={`text-[9px] font-medium ${prio.text} ${prio.bg} px-1.5 py-0.5 rounded-full`}>
+                            {prio.label}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-xs font-medium truncate ${!notif.read ? 'text-white' : 'text-white/60'}`}>
-                        {notif.title}
-                      </p>
-                      <p className="text-[11px] text-white/40 mt-0.5 line-clamp-2">{notif.message}</p>
-                      <p className="text-[10px] text-white/25 mt-1">{formatRelativeTime(notif.created_at)}</p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="flex flex-col items-center py-6 text-center">
-                <Bell size={20} className="text-white/15 mb-2" />
-                <p className="text-xs text-white/30">Sin notificaciones</p>
+                <CheckSquare size={20} className="text-emerald-400/30 mb-2" />
+                <p className="text-xs text-white/30">¡Sin tareas pendientes!</p>
               </div>
             )}
           </>
@@ -552,12 +550,6 @@ export default function DashboardHome() {
               ? ' ¡Todo en orden! 🎉'
               : ' ¡Vamos a ser productivos! 🚀'}
           </p>
-          {unreadCount > 0 && (
-            <div className="mt-2 flex items-center gap-1.5 text-[#f99e02] bg-[#f99e02]/10 px-3 py-1 rounded-full">
-              <Bell size={12} />
-              <span className="text-[11px] font-medium">{unreadCount} sin leer</span>
-            </div>
-          )}
         </div>
       </Card>
     </motion.div>
