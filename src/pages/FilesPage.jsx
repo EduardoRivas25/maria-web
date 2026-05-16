@@ -52,8 +52,11 @@ export default function FilesPage() {
   const [error, setError] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [needsGoogle, setNeedsGoogle] = useState(!isGoogleConnected());
+  const [folderPath, setFolderPath] = useState([{ id: 'root', name: 'Mi Drive' }]);
 
-  const fetchFiles = useCallback(async (query = "") => {
+  const currentFolderId = folderPath[folderPath.length - 1].id;
+
+  const fetchFiles = useCallback(async (query = "", folderId = "root") => {
     setLoading(true);
     setError(null);
     try {
@@ -61,7 +64,7 @@ export default function FilesPage() {
       if (query.trim()) {
         result = await driveApi.search(query);
       } else {
-        result = await driveApi.listFiles({ pageSize: 50 });
+        result = await driveApi.listFiles({ pageSize: 50, folderId });
       }
       setFiles(result.files || []);
     } catch (err) {
@@ -77,15 +80,12 @@ export default function FilesPage() {
   }, []);
 
   useEffect(() => {
-    if (!needsGoogle) fetchFiles();
-  }, [fetchFiles, needsGoogle]);
-
-  useEffect(() => {
+    if (needsGoogle) return;
     const timer = setTimeout(() => {
-      fetchFiles(searchQuery);
+      fetchFiles(searchQuery, currentFolderId);
     }, 500);
     return () => clearTimeout(timer);
-  }, [searchQuery, fetchFiles]);
+  }, [searchQuery, currentFolderId, fetchFiles, needsGoogle]);
 
   const handleDelete = async (e, id) => {
     e.stopPropagation();
@@ -99,6 +99,16 @@ export default function FilesPage() {
       alert("Error al eliminar el archivo");
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleItemClick = (e, file) => {
+    e.stopPropagation();
+    if (file.mimeType === 'application/vnd.google-apps.folder') {
+      setFolderPath(prev => [...prev, { id: file.id, name: file.name }]);
+      setSearchQuery('');
+    } else if (file.webViewLink) {
+      window.open(file.webViewLink, '_blank');
     }
   };
 
@@ -116,8 +126,18 @@ export default function FilesPage() {
             <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Buscar en Drive..." className="bg-transparent border-none outline-none text-sm text-white placeholder-white/30 flex-1" />
           </div>
           {/* Breadcrumbs */}
-          <div className="flex items-center gap-1 text-xs text-white/30">
-            <span className="text-[#f99e02]">Mi Drive</span>
+          <div className="flex items-center gap-1 text-xs text-white/30 overflow-x-auto hide-scrollbar max-w-full">
+            {folderPath.map((folder, index) => (
+              <div key={folder.id} className="flex items-center gap-1 flex-shrink-0">
+                {index > 0 && <span>/</span>}
+                <button 
+                  onClick={() => setFolderPath(prev => prev.slice(0, index + 1))}
+                  className={`hover:text-[#f99e02] transition-colors border-none bg-transparent cursor-pointer p-0 ${index === folderPath.length - 1 ? 'text-[#f99e02]' : ''}`}
+                >
+                  {folder.name}
+                </button>
+              </div>
+            ))}
           </div>
         </div>
         <div className="flex items-center gap-1 bg-white/[0.03] border border-white/[0.06] rounded-xl p-1 self-start sm:self-auto">
@@ -156,15 +176,19 @@ export default function FilesPage() {
             const color = typeColors[file.mimeType] || "#6366f1";
             const isDeleting = deletingId === file.id;
             return (
-              <motion.div key={file.id} variants={item} onClick={(e) => handleOpen(e, file.webViewLink)} className={`bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:border-white/10 hover:shadow-[0_0_30px_rgba(249,158,2,0.04)] transition-all duration-300 cursor-pointer group relative overflow-hidden ${isDeleting ? 'opacity-50 pointer-events-none' : ''}`}>
+              <motion.div key={file.id} variants={item} onClick={(e) => handleItemClick(e, file)} className={`bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:border-white/10 hover:shadow-[0_0_30px_rgba(249,158,2,0.04)] transition-all duration-300 cursor-pointer group relative overflow-hidden ${isDeleting ? 'opacity-50 pointer-events-none' : ''}`}>
                 <div className="flex items-center justify-center w-14 h-14 rounded-xl mx-auto mb-4" style={{ background: `${color}12` }}>
                   <Icon size={28} style={{ color }} />
                 </div>
                 <h4 className="text-sm font-medium text-white/80 text-center truncate group-hover:text-white transition-colors px-2" title={file.name}>{file.name}</h4>
                 <p className="text-xs text-white/30 text-center mt-1">{formatSize(file.size)} · {formatDate(file.modifiedTime)}</p>
                 <div className="flex items-center justify-center gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={(e) => handleOpen(e, file.webViewLink)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all border-none cursor-pointer"><Eye size={14} /></button>
-                  <button onClick={(e) => handleOpen(e, file.webContentLink)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all border-none cursor-pointer"><Download size={14} /></button>
+                  {file.mimeType !== 'application/vnd.google-apps.folder' && (
+                    <>
+                      <button onClick={(e) => handleOpen(e, file.webViewLink)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all border-none cursor-pointer"><Eye size={14} /></button>
+                      <button onClick={(e) => handleOpen(e, file.webContentLink)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-all border-none cursor-pointer"><Download size={14} /></button>
+                    </>
+                  )}
                   <button onClick={(e) => handleDelete(e, file.id)} className="p-2 rounded-lg bg-white/5 hover:bg-red-500/10 text-white/40 hover:text-red-400 transition-all border-none cursor-pointer"><Trash2 size={14} /></button>
                 </div>
                 {isDeleting && (
@@ -189,7 +213,7 @@ export default function FilesPage() {
               const typeLabel = file.mimeType.split('.').pop().split('/').pop();
               
               return (
-                <div key={file.id} onClick={(e) => handleOpen(e, file.webViewLink)} className={`grid grid-cols-[1fr_100px_120px_80px_100px] px-5 py-3 border-b border-white/[0.03] items-center hover:bg-white/[0.02] transition-colors cursor-pointer relative ${isDeleting ? 'opacity-50 pointer-events-none' : ''}`}>
+                <div key={file.id} onClick={(e) => handleItemClick(e, file)} className={`grid grid-cols-[1fr_100px_120px_80px_100px] px-5 py-3 border-b border-white/[0.03] items-center hover:bg-white/[0.02] transition-colors cursor-pointer relative ${isDeleting ? 'opacity-50 pointer-events-none' : ''}`}>
                   <div className="flex items-center gap-3 min-w-0 pr-4">
                     <Icon size={18} style={{ color }} className="flex-shrink-0" />
                     <span className="text-sm text-white/70 truncate" title={file.name}>{file.name}</span>
@@ -198,8 +222,12 @@ export default function FilesPage() {
                   <span className="text-xs text-white/30">{formatDate(file.modifiedTime)}</span>
                   <span className="text-xs text-white/30">{formatSize(file.size)}</span>
                   <div className="flex items-center gap-1 relative z-10">
-                    <button onClick={(e) => handleOpen(e, file.webViewLink)} className="p-1.5 rounded-lg hover:bg-white/5 text-white/30 hover:text-white transition-all border-none cursor-pointer bg-transparent"><Eye size={14} /></button>
-                    <button onClick={(e) => handleOpen(e, file.webContentLink)} className="p-1.5 rounded-lg hover:bg-white/5 text-white/30 hover:text-white transition-all border-none cursor-pointer bg-transparent"><Download size={14} /></button>
+                    {file.mimeType !== 'application/vnd.google-apps.folder' && (
+                      <>
+                        <button onClick={(e) => handleOpen(e, file.webViewLink)} className="p-1.5 rounded-lg hover:bg-white/5 text-white/30 hover:text-white transition-all border-none cursor-pointer bg-transparent"><Eye size={14} /></button>
+                        <button onClick={(e) => handleOpen(e, file.webContentLink)} className="p-1.5 rounded-lg hover:bg-white/5 text-white/30 hover:text-white transition-all border-none cursor-pointer bg-transparent"><Download size={14} /></button>
+                      </>
+                    )}
                     <button onClick={(e) => handleDelete(e, file.id)} className="p-1.5 rounded-lg hover:bg-red-500/5 text-white/30 hover:text-red-400 transition-all border-none cursor-pointer bg-transparent"><Trash2 size={14} /></button>
                   </div>
                   {isDeleting && (
